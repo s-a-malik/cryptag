@@ -4,10 +4,10 @@ Crowdsourcing data labelling tasks on the ethereum blockchain.
 
 ## TODO
 
-[] Front end job creation and dataset upload
-[] Front end labelling
-[] Back end label submission and consensus
-[] Contracts for job posting and REP token 
+- [ ] Front end job creation and dataset upload
+- [ ] Front end labelling
+- [ ] Back end label submission and consensus
+- [ ] Contracts for job posting and REP token 
 
 
 ## Front End
