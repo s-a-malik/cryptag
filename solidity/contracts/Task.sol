@@ -6,7 +6,6 @@ import "hardhat/console.sol";
 contract Task {
   address private sister; // settlement contract
   address private owner;
-  uint private funds;
 
   constructor(address _sister) {
     // TODO
@@ -17,13 +16,11 @@ contract Task {
   // let anyone stake the task
   event Receive(address indexed, uint indexed);
   receive() external payable {
-    funds += msg.value;
     emit Receive(msg.sender, msg.value);
   }
 
   event Deposit(address indexed, uint indexed);
   function deposit() external payable {
-    funds += msg.value;
     emit Deposit(msg.sender, msg.value);
   }
 
@@ -31,8 +28,8 @@ contract Task {
   function settle() public {
     // TODO
     require(msg.sender == owner, 'Only the owner can settle tasks');
-    (bool sent,) = sister.call{value: funds}("");
+    (bool sent,) = sister.call{value: address(this).balance}("");
     require(sent, 'Failed to settle funds');
-    emit Settle(funds); // or address(this).balance
+    emit Settle(address(this).balance); // or address(this).balance
   }
 }
