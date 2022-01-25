@@ -58,6 +58,7 @@ class Task {
     */
     constructor(taskId, taskInfo, contract, images) {
         this.taskId = taskId;
+
         this.info = taskInfo;
         this.contract = contract;
 
@@ -69,11 +70,20 @@ class Task {
             temp[x] = [];
         }
 
+
+        this.taskInfo = taskInfo;
+        this.contract = contract;
+       
+
         // initialize data
         this.data = {
             // imagesIds are the index of the array of images
             images: images,
+
             labels: temp,  // I've changed this to contain empty arrays for each image
+
+            labels: {},  // empty dict to start
+
             labellers: [],
             consensusLabels: {},
             payout: {}
@@ -87,7 +97,11 @@ class Task {
     getTaskInfo() {
         const info = {
             taskId: this.taskId,
+
             taskInfo: this.info,
+
+            taskInfo: this.taskInfo,
+
             contract: this.contract,
         }
         return info;
@@ -102,6 +116,7 @@ class Task {
         // TODO make this more efficient, change to REP weighted.
 
         // payout for each labeller
+
         
         // if called before enough labels are gathered, reject
         if(this.data.labellers.length < this.info.numLabelsRequired) {return false;}
@@ -127,14 +142,17 @@ class Task {
         // this.info.contract.payout(params);
         this.info.status = 'completed';
         return true;
-
     }
 
 }
 
 
+
 const active_tasks = {};
 const completed_tasks = {};
+
+const tasks = []
+
 
 // add an example task
 tasks.push(new Task(
@@ -175,6 +193,11 @@ app.get('/tasks', (req, res) => {
   for (let key of keys) {
     infoToDisplay.push(active_tasks[key].getTaskInfo());
   }
+
+  const infoToDisplay = tasks.map(task => {
+    return task.getTaskInfo();
+    });
+
   res.send({ infoToDisplay });
 });
 
@@ -199,12 +222,16 @@ app.post('/tasks/create-task', (req, res) => {
     const taskId = Date.now();    // TODO: decide what to make this
     // create the task
     active_tasks[taskId] = new Task(taskId, taskInfo, contract, images);
+    const taskId = tasks.length;    // TODO: this could be random instead.
+    // create the task
+    tasks.push(new Task(taskId, taskInfo, contract, images));
 });
 
 // serves images in a random order to the front end inside a task
 // TODO need some security so user's address is used (and verified) in the request
 // - use metamask to provide credential check. 
 // TODO need to make sure that the images are not repeated to the same user
+
 app.get('tasks/get-task', (req, res) => {
     const {labellerAddress} = req.params;
     const {taskId} = req.body;
@@ -229,6 +256,7 @@ app.get('tasks/get-task', (req, res) => {
 })
 
 
+
 // submit labels to server after labelling in front end
 // TODO need to encrypt this to send across internet?
 app.post('tasks/:taskId/submit-labels', (req, res) => {
@@ -242,6 +270,7 @@ app.post('tasks/:taskId/submit-labels', (req, res) => {
   const {labellerAddress} = req.params;
   // unpack request body (labels are a mapping(imageId => label))
   const {taskId, labels} = req.body;
+
   const task = active_tasks[taskId];
 
   // checks to ensure the labelling submission is valid
@@ -278,6 +307,18 @@ app.post('tasks/:taskId/submit-labels', (req, res) => {
       }
   }
   
+  const task = tasks[taskId];
+
+  // iterate through the labels and add them to the task object
+  for (const imageId in labels) {
+    task.data.labels[imageId][address] = labels[imageId];
+  }
+
+  // add the labeller to the list of labellers
+  if (!task.data.labellers.includes(labellerAddress)) {
+    task.data.labellers.push(labellerAddress);
+  }
+
 });
 
 // app.get()
