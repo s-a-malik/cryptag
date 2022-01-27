@@ -9,6 +9,7 @@ Function:
 - Receives labels and stores them in a database.
 - Works out the consensus of the labels for each data point and the payout for each account.
 - Sends the payout to the accounts via smart contract
+- Listens for events from the smart contract and updates the database accordingly.
 
 TODO:
 - expired tasks should be removed from the active tasks list and a partial consensus should be computed
@@ -30,8 +31,9 @@ const { nextTick } = require('process');
 const { assert } = require('console');
 const port = 3042;
 
-// TODO need to save private keys in env and connect a signer
-const provider = new ethers.providers.Web3Provider(ethereum);
+// TODO need to save private keys in .env
+const provider = new ethers.providers.JsonRpcProvider(process.env.RINKEBY_URL);
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
 console.log('Starting server...');
 app.use(cors());
@@ -169,6 +171,24 @@ class Task {
         }
 
         return true;
+    }
+
+    // TODO is this to right way to do an async call?
+    async settleContract() {
+        // TODO should sync updates about contract funds from blockchain
+        // TODO error catching
+        console.log("Paying out contract");
+        const settlement = new ethers.Contract(this.contract.contractAddress, Settlement.abi, wallet);
+
+        // iterate through payout and send funds*payout to each address
+        for (let address in this.data.payout) {
+            // send funds to address
+            const tx = await settlement.disperse(this.data.payout[address], ethers.utils.parseEther(`${this.data.payout[address]*this.contract.funds}`));
+            // console.log(tx); // will have the details of the transaction pre-mining. 
+            await tx.wait();    // wait for the mine
+            console.log(`Tx hash for sending payment to ${this.data.payout[address]}: ${tx.hash}`);
+        }
+        console.log("settled!");
     }
 
     /*
