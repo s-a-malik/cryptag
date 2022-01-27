@@ -22,7 +22,9 @@ require('dotenv').config();
 
 // TODO add ABI to artifacts
 import Settlement from './artifacts/contracts/Settlement.sol/Settlement';   
-
+// TODO need to save private keys in .env
+const provider = new ethers.providers.JsonRpcProvider(process.env.RINKEBY_URL);
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
 const express = require('express');
 const app = express();
@@ -31,9 +33,6 @@ const { nextTick } = require('process');
 const { assert } = require('console');
 const port = 3042;
 
-// TODO need to save private keys in .env
-const provider = new ethers.providers.JsonRpcProvider(process.env.RINKEBY_URL);
-const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
 console.log('Starting server...');
 app.use(cors());
@@ -347,10 +346,11 @@ app.get('tasks/:taskid/get-next-image', (req, res) => {
 
 
 // submit labels to server after labelling in front end
+// TODO is the the right place for async?
 // TODO need to encrypt this to send across internet?
 // TODO need to prevent this from being submitted multiple times or 
 // called directly without actually doing the labels (security), not important for now.
-app.post('tasks/:taskId/submit-labels', (req, res) => {
+app.post('tasks/:taskId/submit-labels', async (req, res) => {
     console.log('Received a batch of labels...');
     const {taskId} = req.params;
     // unpack request body (labels are a mapping(imageId => label))
@@ -393,3 +393,6 @@ app.post('tasks/:taskId/submit-labels', (req, res) => {
 app.listen(port, () => {
   console.log(`Listening on port ${port}!`);
 });
+
+
+main();
