@@ -14,12 +14,21 @@ TODO:
 - Add a way to view see progress of the consensus
 - Test everything
 */
+import {ethers} from 'ethers';
+require('dotenv').config();
+
+// TODO add ABI to artifacts
+import Settlement from './artifacts/contracts/Settlement.sol/Settlement';   
+
 
 const express = require('express');
 const app = express();
 const cors = require('cors');
 const { nextTick } = require('process');
 const port = 3042;
+
+// TODO need to save private keys in env and connect a signer
+const provider = new ethers.providers.Web3Provider(ethereum);
 
 console.log('Starting server...');
 app.use(cors());
@@ -137,9 +146,7 @@ class Task {
             this.data.payout[address] /= totalPayout;
         }
 
-        console.log("Paying out contract");
         // send payout to contract
-        // TODO write this function
         this.settleContract();
 
         if (notExpired) {
@@ -152,17 +159,27 @@ class Task {
         return true;
     }
 
-    settleContract() {
+    // TODO is this to right way to do an async call?
+    async settleContract() {
         // TODO should sync updates about contract funds from blockchain
+        // TODO error catching
+        console.log("Paying out contract");
+        const provider = new ethers.providers.JsonRpcProvider(process.env.RINKEBY_URL);
+        const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+        const settlement = new ethers.Contract(this.contract.contractAddress, Settlement.abi, wallet);
 
         // iterate through payout and send funds*payout to each address
         for (let address in this.data.payout) {
-            // TODO ethers.js code to send funds e.g.
-            send(address, this.data.payout[address]*this.contract.funds);
+            // send funds to address
+            const tx = await settlement.disperse(this.data.payout[address], ethers.utils.parseEther(`${this.data.payout[address]*this.contract.funds}`));
+            // console.log(tx); // will have the details of the transaction pre-mining. 
+            await tx.wait();    // wait for the mine
+            console.log(`Tx hash for sending payment to ${this.data.payout[address]}: ${tx.hash}`);
         }
+        console.log("settled!");
     }
-
 }
+
 
 const activeTasks = {};
 const completedTasks = {};
@@ -311,7 +328,7 @@ app.post('tasks/:taskId/submit-labels', (req, res) => {
 });
 
 // TODO expired tasks should be removed from the active tasks list and a partial consensus should be computed
-// TODO need to regularly poll the blockchain for updates on the contract
+// listen for events from the contracts
 
 app.listen(port, () => {
   console.log(`Listening on port ${port}!`);
