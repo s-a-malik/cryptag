@@ -393,6 +393,3 @@ app.post('tasks/:taskId/submit-labels', async (req, res) => {
 app.listen(port, () => {
   console.log(`Listening on port ${port}!`);
 });
-
-
-main();
