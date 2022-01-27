@@ -105,21 +105,27 @@ class Task {
                 }
             }
         }
+        else {
+            // TODO need to define default (un)label for expired task
+        }
 
-        // try to find a consensus for each image, if one is found add it to the consensus labels
+        // try to find a consensus for each image
         const totalPayout = 0;
+        // iterate through each image
         for (let id = 0; id < this.taskSize; id++) {
+            // compute consensus
+            // TODO test with empty labels dict for expired ones
+
             labelVotes = new Array(this.keySize).fill(0);
-            for (let address in this.data.labels[id]) {
-                labelVotes[this.data.labels[id][address]] += 1;
+            for (const [address, label] of Object.entries(this.data.labels[id])) {
+                labelVotes[label] += 1;
             }
-            // add to consensus label list
-            // TODO test with empty labels dict
             const consensusLabel = labelVotes.indexOf(Math.max(...labelVotes));
+            // add to consensus label list
             consensusLabels[id] = consensusLabel;
             // add consensus labels to payout for that address
-            for (let address in this.data.labels[id]) {
-                if (this.data.labels[id][address] == consensusLabel) {
+            for (const [address, label] of Object.entries(this.data.labels[id]) ) {
+                if (label == consensusLabel) {
                     this.data.payout[address] += 1;
                     totalPayout += 1;
                 }
@@ -127,9 +133,8 @@ class Task {
         }
 
         // normalise the payout
-        for (let address in this.data.payout) {
+        for (const [address, payout] of Object.entries(this.data.payout)) {
             this.data.payout[address] /= totalPayout;
-            this
         }
 
         console.log("Paying out contract");
