@@ -11,7 +11,9 @@ Function:
 - Sends the payout to the accounts via smart contract
 
 TODO:
-- Add a way to view see progress of the consensus
+- expired tasks should be removed from the active tasks list and a partial consensus should be computed
+- listen for events from the contracts and update data accordingly e.g. when funds added
+- Add a way to see progress of the consensus (% complete)/payouts for labellers
 - Test everything
 */
 import {ethers} from 'ethers';
@@ -43,7 +45,7 @@ Each task has the following fields:
     - taskDescription: description of the task for displaying on homepage
     - example: url of the example image and associated label for labellers to see
     - numLabelsRequired: number of labels required *per example* to complete the task
-    - labelOptions: dict of names of possible labels (keys) and their values (unique id)
+    - labelOptions: dict of names of possible labels (keys) and their values (unique labelId)
     - status: the status of the task (active, expired, or completed)
 - contract:
     - contractAddress: address of the smart contract associated with the task
@@ -55,9 +57,8 @@ Each task has the following fields:
     - images: an array of images to be displayed to the user (TODO URLs?)
     - labels: an array of dicts(address => label) of the submitted labels
     - numLabellers: number of labellers who have submitted labels for this task
-    - consensusLabels: the consensus label for each image
-    - payout: payout per labeller (address => value) for each account (created when consensus is reached)  
-        TODO: probs best for this to be a proporitional payout, then send payout*funds. 
+    - consensusLabels: an array of labelIds for the consensus label of each image
+    - payout: fractional payout per labeller (address => value) for each account (created when consensus is reached)  
 */
 class Task {
     /*
@@ -65,7 +66,7 @@ class Task {
     - taskId: unique id for the task (same as index of the array) - get from length of array or random?
     - taskInfo (object): as described above
     - contract (object): as described above
-    - images (array): an array of images to be displayed to the user (URLs?)
+    - images (array): an array of images to be displayed to the user (URLs for now)
     */
     constructor(taskId, taskInfo, contract, images) {
         this.taskId = taskId;
@@ -110,10 +111,9 @@ class Task {
     /*
     Works out the consensus labels given the current labels submitted.
     Also computes the payout for each account.
+    TODO change to REP weighted.
     */
     computeConsenus() {
-        // TODO change to REP weighted.
-        
         // if called before enough labels are gathered and not called when expired, reject
         const notExpired = this.contract.expiry > Date.now();
         if (notExpired) {
@@ -160,6 +160,7 @@ class Task {
         // send payout to contract
         this.settleContract();
 
+        // mark as completed or expired as appropriate
         if (notExpired) {
             this.taskInfo.status = 'completed';
         }
@@ -170,8 +171,13 @@ class Task {
         return true;
     }
 
+    /*
+    Adds labels to the task.
+    Params:
+    - labellerAddress: the address of the labeller
+    - labels [n x 2]: n x 2 array of (imageId, labelId) pairs
+    */
     pushLabels(labellerAddress, labels) {
-
         // add labels to task
         for (let label of labels) {
             // make the imageId object if it doesn't exist
@@ -193,7 +199,9 @@ class Task {
             this.data.labellers.push(labellerAddress);
         }
     }
-
+    /*
+    updates the queue of images to be labelled
+    */
     updateQueue() {
         let temp = this.labelsByItem;
         this.queue = Object.keys(this.labelsByItem).map(function(key) {
@@ -205,6 +213,9 @@ class Task {
         }
     }
 
+    /*
+    Returns the next image to be labelled given a labeller address
+    */
     getImage(labellerAddress) {
         seens = this.seen[labellerAddress];
         if (seens==undefined) {
@@ -222,7 +233,7 @@ class Task {
 
 }
 
-
+// current and completed task objects for storage, to be indexed by taskId
 const activeTasks = {};
 const completedTasks = {};
 
@@ -286,11 +297,9 @@ app.post('/tasks/create-task', (req, res) => {
 });
 
 
-// TODO serve images in a random order to the front end inside a task
+// Serves an image to be labelled for a task given a taskId and labeller address
 // TODO need some security so user's address is used (and verified) in the request - use metamask to provide credential check. 
-// TODO need to make sure that the images are not repeated to the same user
-app.get('tasks/get-task', (req, res) => {
-    // TODO serve one image or a batch at a time, in order of least number of labels submitted. 
+app.get('tasks/:taskid/get-next-image', (req, res) => {
     const {labellerAddress} = req.body;
     const {taskId} = req.params;
     const task = active_tasks[taskId];
@@ -298,19 +307,21 @@ app.get('tasks/get-task', (req, res) => {
     // check that the task is active, not already done by user
     try {
         assert(task != undefined);
-        assert(!task.data.labellers.includes(labellerAddress));
     }
-    catch {
-        //return an error
+    catch(err) {
+        res.status(400).send('Active task not found');
+        throw new Error('Task not found');  // needed?
     }
     let image = task.getImage(labellerAddress);
 
     if (image != false) {
-        let labels = task.data.labelOptions
-        res.send( {image, labels} );
+        let labelOptions = task.data.labelOptions
+        res.send( {image, labelOptions} );
     }
     else {
-        res.send( {'error': 'no available images'} );
+        // res.send( {'error': 'no available images'} );
+        res.status(400).send('No available images');
+        throw new Error('No available images');
     }
 })
 
@@ -358,9 +369,6 @@ app.post('tasks/:taskId/submit-labels', (req, res) => {
 
 
 });
-
-// TODO expired tasks should be removed from the active tasks list and a partial consensus should be computed
-// listen for events from the contracts
 
 app.listen(port, () => {
   console.log(`Listening on port ${port}!`);
