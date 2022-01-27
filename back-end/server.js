@@ -9,31 +9,45 @@ Function:
 - Receives labels and stores them in a database.
 - Works out the consensus of the labels for each data point and the payout for each account.
 - Sends the payout to the accounts via smart contract
+- Listens for events from the smart contract and updates the database accordingly.
 
 TODO:
-- Add a way to view see progress of the consensus
+- expired tasks should be removed from the active tasks list and a partial consensus should be computed
+- listen for events from the contracts and update data accordingly e.g. when funds added
+- Add a way to see progress of the consensus (% complete)/payouts for labellers
 - Test everything
 */
+import {ethers} from 'ethers';
+require('dotenv').config();
+
+// TODO add ABI to artifacts
+import Settlement from './artifacts/contracts/Settlement.sol/Settlement';   
+// TODO need to save private keys in .env
+const provider = new ethers.providers.JsonRpcProvider(process.env.RINKEBY_URL);
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
 const express = require('express');
 const app = express();
 const cors = require('cors');
+const { nextTick } = require('process');
+const { assert } = require('console');
 const port = 3042;
+
 
 console.log('Starting server...');
 app.use(cors());
-app.use(express.json());
+app.use(express.json());    // for parsing application/json
 
 /* base task class
 Each task has the following fields:
-- taskId: unique id for the task (same as index of the array) Necessary?
+- taskId: unique id for the task
 - taskInfo:
     - taskName: name of the task
     - taskDescription: description of the task for displaying on homepage
     - example: url of the example image and associated label for labellers to see
     - numLabelsRequired: number of labels required *per example* to complete the task
-    - labelOptions: dict of names of possible labels (keys) and their values (unique id)
-    - status: the status of the task (open, expired, or completed)
+    - labelOptions: dict of names of possible labels (keys) and their values (unique labelId)
+    - status: the status of the task (active, expired, or completed)
 - contract:
     - contractAddress: address of the smart contract associated with the task
     - setter: the public address that created the task
@@ -44,9 +58,8 @@ Each task has the following fields:
     - images: an array of images to be displayed to the user (TODO URLs?)
     - labels: an array of dicts(address => label) of the submitted labels
     - numLabellers: number of labellers who have submitted labels for this task
-    - consensusLabels: the consensus label for each image
-    - payout: payout per labeller (address => value) for each account (created when consensus is reached)  
-        TODO: probs best for this to be a proporitional payout, then send payout*funds. 
+    - consensusLabels: an array of labelIds for the consensus label of each image
+    - payout: fractional payout per labeller (address => value) for each account (created when consensus is reached)  
 */
 class Task {
     /*
@@ -54,54 +67,43 @@ class Task {
     - taskId: unique id for the task (same as index of the array) - get from length of array or random?
     - taskInfo (object): as described above
     - contract (object): as described above
-    - images (array): an array of images to be displayed to the user (TODO URLs?)
+    - images (array): an array of images to be displayed to the user (URLs for now)
     */
     constructor(taskId, taskInfo, contract, images) {
         this.taskId = taskId;
-
-        this.info = taskInfo;
+        this.taskInfo = taskInfo;
         this.contract = contract;
 
         this.keySize = Object.keys(taskInfo.labelOptions).length;
         this.taskSize = images.length;
        
-        const temp = {};
-        for (let x = 0; x < this.taskSize; x++) {
-            temp[x] = [];
+        this.queue = [];
+        this.labelsByItem = {};
+        for (let ind = 0; ind < this.taskSize; ind++) {
+            this.labelsByItem[ind] = 0;
+            this.queue.push[ind];
         }
-
-
-        this.taskInfo = taskInfo;
-        this.contract = contract;
-       
+        this.seen = {};
 
         // initialize data
         this.data = {
             // imagesIds are the index of the array of images
             images: images,
-
-            labels: temp,  // I've changed this to contain empty arrays for each image
-
-            labels: {},  // empty dict to start
-
+            labels: {},  // empty dict to start. This will be mapping {imageId: {address: label}}
             labellers: [],
-            consensusLabels: {},
-            payout: {}
+            consensusLabels: [],    // consensus labels for each image (indexed by imageId)
+            payout: {}  // map of address => fractional payout
         }
     }
 
     /*
     Returns public information about the task in an object
-    TODO could be a getter?
     */
     getTaskInfo() {
         const info = {
             taskId: this.taskId,
-
-            taskInfo: this.info,
-
+            taskSize: this.taskSize,
             taskInfo: this.taskInfo,
-
             contract: this.contract,
         }
         return info;
@@ -109,53 +111,153 @@ class Task {
 
     /*
     Works out the consensus labels given the current labels submitted.
+    Also computes the payout for each account.
+    TODO change to REP weighted.
     */
     computeConsenus() {
+        // if called before enough labels are gathered and not called when expired, reject
+        const notExpired = this.contract.expiry > Date.now();
+        if (notExpired) {
+            for (let id = 0; id < this.taskSize; id++) {
+                if (Object.keys(this.data.labels[id]).length < this.taskInfo.numLabelsRequired) {
+                    return false;
+                }
+            }
+        }
+        else {
+            // TODO need to define default (un)label for expired task
+        }
 
-        // iterate through label array and allocate consensus via majority vote
-        // TODO make this more efficient, change to REP weighted.
+        // try to find a consensus for each image
+        let totalPayout = 0;
+        for (let address of this.data.labellers) {this.data.payout[address]=0;}
 
-        // payout for each labeller
-
-        
-        // if called before enough labels are gathered, reject
-        if(this.data.labellers.length < this.info.numLabelsRequired) {return false;}
-
-        // try to find a consensus for each image, if one is found add it to the consensus labels
+        // iterate through each image
         for (let id = 0; id < this.taskSize; id++) {
-            const votes = [];
-            for (let x = 0; x < this.keySize; x++) {votes.push(0);}
-            for (let vote of this.data.labels[id]) {votes[vote] += 1;}
-            for (let index of votes) {
-                if (index > this.info.numLabelsRequired/2) {this.data.consensusLabels[id] = this.info.labelOptions[votes.indexOf(index)];}
+            // compute consensus
+            // TODO test with empty labels dict for expired ones
+
+            const labelVotes = new Array(this.keySize).fill(0);
+            for (const [address, label] of Object.entries(this.data.labels[id])) {
+                labelVotes[label] += 1;
+            }
+            const consensusLabel = labelVotes.indexOf(Math.max(...labelVotes));
+            // add to consensus label list
+            this.data.consensusLabels[id] = consensusLabel;
+            // add consensus labels to payout for that address
+            for (const [address, label] of Object.entries(this.data.labels[id]) ) {
+                if (label == consensusLabel) {
+                    this.data.payout[address] += 1;
+                    totalPayout += 1;
+                }
             }
         }
 
-        // if all images don't have a consensus label, reject completion and increase labelling requirements
-        // other option: complete task anyway but inform the customer that their number of labels was insufficient to achieve consensus
-        if (Object.keys(this.data.consensusLabels).length != this.taskSize) {
-            this.info.numLabelsRequired += 1;
-            this.data.consensusLabels = {};
-            return false;
+        // normalise the payout
+        for (const [address, payout] of Object.entries(this.data.payout)) {
+            this.data.payout[address] /= totalPayout;
         }
 
-        // this.info.contract.payout(params);
-        this.info.status = 'completed';
+        // send payout to contract
+        this.settleContract();
+
+        // mark as completed or expired as appropriate
+        if (notExpired) {
+            this.taskInfo.status = 'completed';
+        }
+        else {
+            this.taskInfo.status = 'expired';
+        }
+
         return true;
+    }
+
+    // TODO is this to right way to do an async call?
+    async settleContract() {
+        // TODO should sync updates about contract funds from blockchain
+        // TODO error catching
+        console.log("Paying out contract");
+        const settlement = new ethers.Contract(this.contract.contractAddress, Settlement.abi, wallet);
+
+        // iterate through payout and send funds*payout to each address
+        for (let address in this.data.payout) {
+            // send funds to address
+            const tx = await settlement.disperse(this.data.payout[address], ethers.utils.parseEther(`${this.data.payout[address]*this.contract.funds}`));
+            // console.log(tx); // will have the details of the transaction pre-mining. 
+            await tx.wait();    // wait for the mine
+            console.log(`Tx hash for sending payment to ${this.data.payout[address]}: ${tx.hash}`);
+        }
+        console.log("settled!");
+    }
+
+    /*
+    Adds labels to the task.
+    Params:
+    - labellerAddress: the address of the labeller
+    - labels [n x 2]: n x 2 array of (imageId, labelId) pairs
+    */
+    pushLabels(labellerAddress, labels) {
+        // add labels to task
+        for (let label of labels) {
+            // make the imageId object if it doesn't exist
+            if (!(label[0] in this.data.labels)) {
+                this.data.labels[label[0]] = {};
+            }
+            
+            // check this labeller hasn't already labelled this image
+            // if they have, just ignore it entirely for now
+            if (this.data.labels[label[0]][labellerAddress] == undefined) {
+                this.data.labels[label[0]][labellerAddress] = label[1];
+                this.labelsByItem[label[0]] += 1;
+            }
+        }
+        this.updateQueue();
+
+        // add the labeller to the list of labellers
+        if (!(this.data.labellers.includes(labellerAddress))) {
+            this.data.labellers.push(labellerAddress);
+        }
+    }
+    /*
+    updates the queue of images to be labelled
+    */
+    updateQueue() {
+        let temp = this.labelsByItem;
+        this.queue = Object.keys(this.labelsByItem).map(function(key) {
+            return [key, temp[key]];
+        });
+        this.queue.sort(function(a,b) {return a[1]-b[1];});
+        for (let x in this.queue) {
+            this.queue[x] = this.queue[x][0];
+        }
+    }
+
+    /*
+    Returns the next image to be labelled given a labeller address
+    */
+    getImage(labellerAddress) {
+        seens = this.seen[labellerAddress];
+        if (seens==undefined) {
+            seens = [];
+            this.seen[labellerAddress] = seens;
+        }
+
+        for (let id of this.queue) {
+            if (!seens.includes(parseInt(id))) {
+                this.seen[labellerAddress].push(parseInt(id));
+                return [id, this.data.images[id]];}
+        };
+        return false;
     }
 
 }
 
-
-
-const active_tasks = {};
-const completed_tasks = {};
-
-const tasks = []
-
+// current and completed task objects for storage, to be indexed by taskId
+const activeTasks = {};
+const completedTasks = {};
 
 // add an example task
-tasks.push(new Task(
+activeTasks[0] = new Task(
     0,
     {
         taskName: 'Test Task',
@@ -167,7 +269,7 @@ tasks.push(new Task(
             'person': '1',
             'field': '2'
         },
-        status: 'open',
+        status: 'active',
     },
     {
         contractAddress: '0x0',
@@ -181,148 +283,112 @@ tasks.push(new Task(
         'https://picsum.photos/300',
         'https://picsum.photos/400',
     ]
-));
-
+);
 
 // show the tasks available to the front end 
 app.get('/tasks', (req, res) => {
-  // only show task info, not the data
-  // TODO: only show tasks that are open?
-  const infoToDisplay = [];
-  keys = Object.keys(active_tasks);
-  for (let key of keys) {
-    infoToDisplay.push(active_tasks[key].getTaskInfo());
-  }
-
-  const infoToDisplay = tasks.map(task => {
-    return task.getTaskInfo();
-    });
-
-  res.send({ infoToDisplay });
-});
-
-
-// create a new task
-// TODO should be a PUT request?
-app.post('/tasks/create-task', (req, res) => {
-    const setterAddress = req.body;
-    const {taskInfo, expiry, funds, images} = req.body;
-
-    // TODO create contract here (or should do on client side)
-
-    // contract info for database
-    const contract = {
-        contractAddress: '',    // TODO: get from blockchain
-        setter: setterAddress,
-        created: Date.now(),    // TODO: get from blockchain
-        expiry: expiry,
-        funds: funds,           // TODO: get from blockchain instead
+    // only show task info, not the data
+    const infoToDisplay = [];
+    // show open tasks
+    keys = Object.keys(activeTasks);
+    for (let key of keys) {
+        infoToDisplay.push(activeTasks[key].getTaskInfo());
+    }
+    // whether to also show completed tasks or not
+    const showCompleted = req.params.showCompleted;
+    if (showCompleted == 'true') {
+        keys = Object.keys(completedTasks);
+        for (let key of keys) {
+        infoToDisplay.push(completedTasks[key].getTaskInfo());
+        }
     }
 
+    res.send({ infoToDisplay });
+});
+
+// create a new task
+app.post('/tasks/create-task', (req, res) => {
+    // TODO create contract on client side and send info here 
+    const {taskInfo, contract, images} = req.body;
     const taskId = Date.now();    // TODO: decide what to make this
     // create the task
     active_tasks[taskId] = new Task(taskId, taskInfo, contract, images);
-    const taskId = tasks.length;    // TODO: this could be random instead.
-    // create the task
-    tasks.push(new Task(taskId, taskInfo, contract, images));
 });
 
-// serves images in a random order to the front end inside a task
-// TODO need some security so user's address is used (and verified) in the request
-// - use metamask to provide credential check. 
-// TODO need to make sure that the images are not repeated to the same user
 
-app.get('tasks/get-task', (req, res) => {
-    const {labellerAddress} = req.params;
-    const {taskId} = req.body;
+// Serves an image to be labelled for a task given a taskId and labeller address
+// TODO need some security so user's address is used (and verified) in the request - use metamask to provide credential check. 
+app.get('tasks/:taskid/get-next-image', (req, res) => {
+    const {labellerAddress} = req.body;
+    const {taskId} = req.params;
     const task = active_tasks[taskId];
 
     // check that the task is active, not already done by user
     try {
         assert(task != undefined);
-        assert(!task.data.labellers.includes(labellerAddress));
     }
-    catch {
-        //return an error
+    catch(err) {
+        res.status(400).send('Active task not found');
+        throw new Error('Task not found');  // needed?
     }
+    let image = task.getImage(labellerAddress);
 
-    const imgs = task.data.images;
-    const labels = task.info.labelOptions;
-
-    // the images aren't shuffled as it will require some thinking about- do we want to keep track of the order
-    // we sent the images to the client in? otherwise we need to provide them with a canonical id for each image
-    // which would make the original order reconstructable by a determined group of labellers 
-    res.send( {imgs, labels} );
+    if (image != false) {
+        let labelOptions = task.data.labelOptions
+        res.send( {image, labelOptions} );
+    }
+    else {
+        // res.send( {'error': 'no available images'} );
+        res.status(400).send('No available images');
+        throw new Error('No available images');
+    }
 })
 
 
-
 // submit labels to server after labelling in front end
+// TODO is the the right place for async?
 // TODO need to encrypt this to send across internet?
-app.post('tasks/:taskId/submit-labels', (req, res) => {
-  console.log('Received a batch of labels...');
-  // TODO need user's address to be verified - sign with metamask
-  // TODO need to prevent this from being submitted multiple times or 
-  // called directly without actually doing the labels (security), not important for now.
-  // TODO need to check whether the taskId exists
+// TODO need to prevent this from being submitted multiple times or 
+// called directly without actually doing the labels (security), not important for now.
+app.post('tasks/:taskId/submit-labels', async (req, res) => {
+    console.log('Received a batch of labels...');
+    const {taskId} = req.params;
+    // unpack request body (labels are a mapping(imageId => label))
+    const {labellerAddress, labels} = req.body;
+    // check task exists
+    try {
+        assert(taskId in activeTasks);
+    }
+    catch(err) {
+        res.status(400).send('Active task not found');
+        throw new Error('Task not found');  // needed?
+    }
 
-  // get the address of the labeller
-  const {labellerAddress} = req.params;
-  // unpack request body (labels are a mapping(imageId => label))
-  const {taskId, labels} = req.body;
+    let task = activeTasks[taskId];
+    // check all labels are valid
+    try {
+        for (let label of labels) {
+            assert(label[0] < task.taskSize);
+            assert(label[1] < task.keySize);
+        }
+    }
+    catch(err) {
+        res.status(400).send('Invalid label submitted');
+        throw new Error('Invalid label');
+    }
 
-  const task = active_tasks[taskId];
+    task.pushLabels(labellerAddress, labels);
 
-  // checks to ensure the labelling submission is valid
-  // so far- user hasn't already submitted, each item has been labelled, each label is part of the labelset
-  // the second requirement would be nice to remove for large datasets but isn't compatible with the current code
-  try {
-      assert(task != undefined);
-      assert(!task.data.labellers.includes(labellerAddress));
-      assert(labels.length == task.taskSize);
-      for (let label of labels) {
-          assert(labels[label] < task.keySize);
-      }
-  }
-  catch(err) {
-      // return an error- this is not a valid labelling
-      return 'no';
-  }
+    // if enough labels have been submitted, complete the task
+    if (task.computeConsenus()) {
+        // add the task to the completed tasks
+        completedTasks[taskId] = task;
+        // remove the task from the active tasks
+        delete activeTasks[taskId];
+        }
 
-  // iterate through the labels and add them to the task object
-  for (const imageId in labels) {
-      task.data.labels[imageId].push(labels[imageId]);
-  }
-
-  // add the labeller to the list of labellers
-  task.data.labellers.push(labellerAddress);
-
-  // if the required number of labellers have contributed, attempt to complete the task.
-  // if successful the labels are sent back to the setter and the task is removed from the pile
-  if(task.info.numLabelsRequired == task.data.labellers.length) {
-      if (task.computeConsenus()) {
-          completed_tasks[taskId] = task;
-          delete active_tasks[taskId];
-          // send consensus labels back to setter
-      }
-  }
-  
-  const task = tasks[taskId];
-
-  // iterate through the labels and add them to the task object
-  for (const imageId in labels) {
-    task.data.labels[imageId][address] = labels[imageId];
-  }
-
-  // add the labeller to the list of labellers
-  if (!task.data.labellers.includes(labellerAddress)) {
-    task.data.labellers.push(labellerAddress);
-  }
 
 });
-
-// app.get()
-
 
 app.listen(port, () => {
   console.log(`Listening on port ${port}!`);
