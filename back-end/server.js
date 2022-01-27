@@ -69,9 +69,9 @@ class Task {
         this.data = {
             // imagesIds are the index of the array of images
             images: images,
-            labels: {},  // empty dict to start
+            labels: {},  // empty dict to start. This will be mapping {imageId: {address: label}}
             labellers: [],
-            consensusLabels: [],
+            consensusLabels: [],    // consensus labels for each image (indexed by imageId)
             payout: {}  // map of address => fractional payout
         }
     }
