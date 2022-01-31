@@ -1,4 +1,4 @@
-import {Button, Box, Text } from "@chakra-ui/react"
+import {Button, Box, Text, Center } from "@chakra-ui/react"
 import {ethers} from 'ethers';
 export default function ConnectWalletButton () {
 
@@ -26,9 +26,10 @@ export default function ConnectWalletButton () {
             alert("No wallet detected, please install metamask.")
         }
     }
-    return (
-        <Button mt={4} colorScheme='teal' type='submit' onClick={connectWallet} >
+    return (<Center>
+        <Button mt={4} colorScheme='teal' type='submit' className="connectButton" onClick={connectWallet} >
         Connect Wallet
         </Button>
+        </Center>
     )
 }
