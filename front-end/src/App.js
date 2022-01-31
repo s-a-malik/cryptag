@@ -2,63 +2,40 @@ import { useEffect, useState } from 'react';
 // import contract from './contracts/Creater.json';
 import { ethers } from 'ethers';
 
+// TODO import contract ABI and bytecode
 const contractAddress = "";
-// const abi = contract.abi;
+const abi = contract.abi;
+const bytecode = '';
+const backend = '';
+
 
 function App() {
+  // ropsten test network
+  const provider = new ethers.providers.Web3Provider(window.ethereum, "ropsten");
+  const signer = await provider.getSigner();
+  const [dbURL, setdbURL] = useState('');
+  const [taskInfo, setTaskInfo] = useState('');
+  const [deployedAddress, setDeployedAddress] = useState('');
 
-  const [currentAccount, setCurrentAccount] = useState(null);
 
-  const checkWalletIsConnected = async () => {
-    const { ethereum } = window;
+  async function deployContract()
+  {
+    // deploy a new Task contract
+    const Task = await ethers.getContractFactory(abi, bytecode, signer);
+    const task = await Task.deploy()
 
-    if (!ethereum) {
-      console.log("Make sure you have Metamask installed!");
-      return;
-    } else {
-      console.log("Wallet exists! We're ready to go!")
-    }
+    await task.deployed;
+    const deployedAddress = task.address;
+    
 
-    const accounts = await ethereum.request({ method: 'eth_accounts' });
-
-    if (accounts.length !== 0) {
-      const account = accounts[0];
-      console.log("Found an authorized account: ", account);
-      setCurrentAccount(account);
-    } else {
-      console.log("No authorized account found");
-    }
   }
 
-  const connectWalletHandler = async () => {
-    const { ethereum } = window;
+  async function submitToBackend(){
 
-    if (!ethereum) {
-      alert("Please install Metamask!");
-    }
-
-    try {
-      const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-      console.log("Found an account! Address: ", accounts[0]);
-      setCurrentAccount(accounts[0]);
-    } catch (err) {
-      console.log(err)
-    }
-  }
-
-  const connectWalletButton = () => {
-    return (
-      <button onClick={connectWalletHandler} className='cta-button connect-wallet-button'>
-        Connect Wallet
-      </button>
-    )
   }
 
 
 
-  useEffect(() => {
-    checkWalletIsConnected();
-  }, []);
 
   return (
     <div className='main-app'>
