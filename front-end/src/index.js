@@ -1,12 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import App from './App';
+import TaskCreation from './TaskCreation';
 import {ethers} from 'ethers';
+import { ChakraProvider } from '@chakra-ui/react'
 
 ReactDOM.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+  <ChakraProvider>
+    <TaskCreation />
+  </ChakraProvider>,
   document.getElementById('root')
 );
 
