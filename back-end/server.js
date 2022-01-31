@@ -263,9 +263,9 @@ activeTasks[0] = new Task(
         example: 'https://picsum.photos/200',
         numLabelsRequired: 3,
         labelOptions: {
-            'road': '0',
-            'person': '1',
-            'field': '2'
+            'road': 0,
+            'person': 1,
+            'field': 2
         },
         status: 'active',
     },
@@ -312,6 +312,9 @@ app.post('/tasks/create-task', (req, res) => {
     const taskId = Date.now();    // TODO: decide what to make this
     // create the task
     activeTasks[taskId] = new Task(taskId, taskInfo, contract, images);
+    
+    // send the taskId back to the client
+    res.send({ taskId });
 });
 
 
@@ -388,7 +391,9 @@ app.post('tasks/submit-labels/:taskId', async (req, res) => {
         // remove the task from the active tasks
         delete activeTasks[taskId];
         }
-
+        res.send(`Task completed`);
+    // should send more info than this really
+    res.send(`Labels submitted`);
 
 });
 
