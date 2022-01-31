@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form'
-
+import ConnectWalletButton from './Components/ConnectWalletButton'
 
 // import contract from './contracts/Creater.json';
 import { ethers } from 'ethers';
@@ -26,48 +26,40 @@ const backendURL = '';
 
 
 function TaskCreation() {
-  // ropsten test network
-  const provider = new ethers.providers.Web3Provider(window.ethereum, "ropsten");
-  const signer = provider.getSigner();
-  const [taskName, setTaskName] = useState('');
-  const [example, setExample] = useState('');
-  const [images, setImages] = useState();
-  const [taskInfo, setTaskInfo] = useState('');
-  const [numLabelsRequired, setNumLabelsRequired] = useState();
-  const [labelOptions, setLabelOptions] = useState();
-  const [expiryDate, setExpiryDate] = useState('');
-  const [taskFunds, setTaskFunds] = useState();
+  // rinkeby test network
+  const provider = new ethers.providers.Web3Provider(window.ethereum, "rinkeby");
 
   // form
   const {handleSubmit, register, formState: {errors, isSubmitting},} = useForm();
 
-  async function postToBackend(deployedAddress) {
+  async function postToBackend(values) {
     
     // TODO check what time to use? 
     const contractObject = {
-      contractAddress : deployedAddress,
-      setter : signer.getAddress(),
+      contractAddress : values.deployedAddress,
+      setter : provider.getSigner().getAddress(),
       created : Date.now(),
-      expiry : expiryDate,
-      funds : taskFunds
+      expiry : values['expiry-date'],
+      funds : values['funds-assigned']
     };
 
     const taskInfo = {
-      taskName : taskName,
-      taskDesription : taskInfo,
-      example : example,
-      numLabelsRequired : numLabelsRequired,
-      labelOptions : labelOptions, 
+      taskName : values['task-name'],
+      taskDesription : values['task-description'],
+      example : values['example'],
+      numLabelsRequired : values['num-labels'],
+      labelOptions : values['ptins'], 
       status : "active"
     }
 
     const data  = {
       contractObject : contractObject,
       taskInfo : taskInfo,
-      images : images
+      images : values['images']
     }
 
     // post to back end
+    alert(JSON.stringify(data));
     const rawResponse = await fetch(backendURL, {
         method: 'POST', // *GET, POST, PUT, DELETE, etc.
         headers: {
@@ -80,32 +72,20 @@ function TaskCreation() {
     return content;
   }
 
-  function validateInput(){
-    // Validates the state variables for task creation
-    // TODO implement
-    let response = {
-        success : false,
-        errMessage : ""
-    }
-    return response;
-  }
 
-  async function deployContract()
+
+  async function deployContract(values)
   { 
-    let validationMessage = validateInput();
-    if (validationMessage.success) { 
-      // deploy a new Task contract
-      const Task = await ethers.ContractFactory(abi, bytecode, signer);
-      const task = await Task.deploy()
+    // deploy a new Task contract
+    const Task = await new ethers.ContractFactory(abi, bytecode, provider.getSigner());
+    const task = await Task.deploy()
+    await task.deployed();
+    const deployedAddress = task.address;
+    values.deployedAddress = deployedAddress
 
-      await task.deployed;
-      const deployedAddress = task.address;
+    // TODO send funds to contract
 
-      postToBackend(deployedAddress);
-    }
-    else{
-      console.log(validationMessage.errMessage)
-    }
+    postToBackend(values);
 
   }
 
@@ -113,16 +93,14 @@ function TaskCreation() {
 
   function onSubmit(values) {
     return new Promise((resolve) => {
-      setTimeout(() => {
-        alert(JSON.stringify(values, null, 2))
-        resolve()
-      }, 3000)
+      deployContract(values)
     })
   }
 
 // TODO form validation with Yup
   return (
     <div className='task-creation'>
+      <ConnectWalletButton/>
       <h1>Task Creation</h1>
       <form onSubmit={handleSubmit(onSubmit)}>
       <FormControl isRequired>
@@ -156,7 +134,9 @@ function TaskCreation() {
           <InputRightAddon children='Gwei' />
         </InputGroup>
         <FormLabel htmlFor='example'>Example Labelling</FormLabel>
-        <Input id='example' placeholder='Task Name' />
+        <Input id='example' placeholder='Task Name' {...register('eample', {
+            required: true,
+            })}/>
         <FormLabel htmlFor='expiry-date'>Expiry Date</FormLabel>
         <Input id='expiry-date' placeholder='12/05/22' {...register('expiry-date', {
             required: true,
