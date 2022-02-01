@@ -4,13 +4,13 @@ pragma solidity ^0.8.0;
 import "hardhat/console.sol";
 
 contract Task {
-  address private sister; // settlement contract
+  address public settlement; // settlement contract
   address private owner;
 
-  constructor(address _sister) {
+  constructor(address _settlement) {
     // TODO
     owner = msg.sender;
-    sister = _sister;
+    settlement = _settlement;
   }
 
   // let anyone stake the task
@@ -27,9 +27,10 @@ contract Task {
   event Settle(uint);
   function settle() public {
     // TODO
+    uint _amount = address(this).balance;
     require(msg.sender == owner, 'Only the owner can settle tasks');
-    (bool sent,) = sister.call{value: address(this).balance}("");
+    (bool sent,) = settlement.call{value: address(this).balance}("");
     require(sent, 'Failed to settle funds');
-    emit Settle(address(this).balance); // or address(this).balance
+    emit Settle(_amount); // or address(this).balance
   }
 }
