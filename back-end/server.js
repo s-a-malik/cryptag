@@ -286,7 +286,6 @@ activeTasks[0] = new Task(
 
 // show the tasks available to the front end 
 app.get('/tasks', (req, res) => {
-    console.log("test");
     // only show task info, not the data
     const infoToDisplay = [];
     // show open tasks
