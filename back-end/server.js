@@ -30,6 +30,7 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const { assert } = require('console');
+const { nextTick } = require('process');
 const port = 3042;
 
 
@@ -294,7 +295,7 @@ app.get('/tasks', (req, res) => {
         infoToDisplay.push(activeTasks[key].getTaskInfo());
     }
     // whether to also show completed tasks or not
-    const showCompleted = req.params.showCompleted;
+    const showCompleted = req.query.showCompleted;
     if (showCompleted == 'true') {
         keys = Object.keys(completedTasks);
         for (let key of keys) {
@@ -355,31 +356,34 @@ app.get('/tasks/:taskId/get-next-image', (req, res) => {
 // TODO need to encrypt this to send across internet?
 // TODO need to prevent this from being submitted multiple times or 
 // called directly without actually doing the labels (security), not important for now.
-app.post('tasks/submit-labels/:taskId', async (req, res) => {
-    console.log('Received a batch of labels...');
+app.post('/tasks/:taskId/submit-labels', async (req, res, next) => {
     const {taskId} = req.params;
-    // unpack request body (labels are a mapping(imageId => label))
+    // unpack request body labels are list of tuples [imageId, labelId]
     const {labellerAddress, labels} = req.body;
+    const send = {};
+    console.log(`Labels received for task ${taskId} by labeller ${labellerAddress}`);
+
     // check task exists
-    try {
-        assert(taskId in activeTasks);
-    }
-    catch(err) {
-        res.status(400).send('Active task not found');
-        throw new Error('Task not found');  // needed?
+    if (!(taskId in activeTasks)) {
+        next(new Error('Task not found'));
+        res.status(400);
+        send["error"] = "Active task not found";
     }
 
     let task = activeTasks[taskId];
     // check all labels are valid
-    try {
-        for (let label of labels) {
-            assert(label[0] < task.taskSize);
-            assert(label[1] < task.keySize);
-        }
-    }
-    catch(err) {
-        res.status(400).send('Invalid label submitted');
-        throw new Error('Invalid label');
+    // try {
+    for (let label of labels) {
+        if (label[0] >= task.taskSize) {
+            next(new Error("Image id out of range"));
+            res.status(400);
+            send["error"] = 'Image id out of range';
+        };
+        if (label[1] >= task.keySize) {
+            next(new Error("Label id out of range"));
+            res.status(400);
+            send["error"] = "Label id out of range";
+        };
     }
 
     task.pushLabels(labellerAddress, labels);
@@ -390,10 +394,13 @@ app.post('tasks/submit-labels/:taskId', async (req, res) => {
         completedTasks[taskId] = task;
         // remove the task from the active tasks
         delete activeTasks[taskId];
-        }
-        res.send(`Task completed`);
+        send["completed"] = `true`;
+    }
+    else {
+        send["complete"] = `false`
+    };
     // should send more info than this really
-    res.send(`Labels submitted`);
+    res.send(send);
 
 });
 
