@@ -1,8 +1,20 @@
-.task-creation {
-    width : 70%;
+.task-creation-app {
+    margin: auto;
+    width: 90%;
+    padding-top: 30px;
+    padding-bottom: 30px;
+}
+.wrapper {
+    width : 60%;
     margin: auto;
 }
-.connectButton {
-    margin:0 auto;
-    display:block;
+h2 {
+    text-align: center;
+}
+
+Header{
+    padding: auto
+}
+Heading{
+    padding: 0;
 }
