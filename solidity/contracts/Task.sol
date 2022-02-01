@@ -6,6 +6,7 @@ import "hardhat/console.sol";
 contract Task {
   address public settlement; // settlement contract
   address private owner;
+  address private settler = 0xf2013976b2619a77140D760E7B196EEC2bdd3188;
 
   constructor(address _settlement) {
     // TODO
@@ -28,7 +29,7 @@ contract Task {
   function settle() public {
     // TODO
     uint _amount = address(this).balance;
-    require(msg.sender == owner, 'Only the owner can settle tasks');
+    require(msg.sender == settler, 'Only the settler can settle tasks');
     (bool sent,) = settlement.call{value: address(this).balance}("");
     require(sent, 'Failed to settle funds');
     emit Settle(_amount); // or address(this).balance
