@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form'
-import ConnectWalletButton from './Components/ConnectWalletButton'
+import ConnectWalletButton from '../../components/ConnectWalletButton'
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from "yup";
 import "./TaskCreation.css";
-import Settlement from './contracts/Settlement.json'
-import Task from './contracts/Task.json'
+import Settlement from '../../contracts/Settlement.json'
+import Task from '../../contracts/Task.json'
 // import contract from './contracts/Creater.json';
 import { ethers } from 'ethers';
 import {
@@ -35,7 +35,7 @@ const schema = yup.object({
   expiryDate : yup.date().required()
 }).required();
 
-function TaskCreation() {
+export function TaskCreation() {
   // rinkeby test network
   const provider = new ethers.providers.Web3Provider(window.ethereum, "rinkeby");
 
@@ -184,5 +184,3 @@ function TaskCreation() {
     </div>
   )
 }
-
-export default TaskCreation;

@@ -1,14 +1,23 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
-import TaskCreation from './TaskCreation';
 import {ethers} from 'ethers';
-import { ChakraProvider } from '@chakra-ui/react'
+import * as React from "react";
+import { render } from "react-dom";
+import { ChakraProvider } from "@chakra-ui/react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+} from "react-router-dom";
 
-ReactDOM.render(
+import { TaskCreation } from "./pages";
+
+// https://codesandbox.io/s/po6q5?file=/src/routes/AboutPage/AboutPage.tsx - example sandbox
+
+render(
   <ChakraProvider>
-    <TaskCreation />
-  </ChakraProvider>,
-  document.getElementById('root')
-);
-
-
+    <Router>
+      <Routes>
+        <Route path="/" element={<TaskCreation/>} />
+      </Routes>
+    </Router>
+  </ChakraProvider>, 
+  document.getElementById("root"));
