@@ -326,27 +326,28 @@ app.get('/tasks/:taskId/get-next-image', (req, res) => {
     console.log(`Getting next image for task ${taskId} for labeller ${labellerAddress}`);    
 
     const task = activeTasks[taskId];
+    let send = {};
 
     // check that the task is active, not already done by user
-    try {
-        assert(task != undefined);
-    }
-    catch(err) {
-        res.status(400).send('Active task not found');
-        throw new Error('Task not found');  // needed?
+    if (task == undefined) {
+        res.status(400);
+        send['error'] = 'Task does not exist';
+        throw new Error('Task not found');
     }
     let image = task.getImage(labellerAddress);
     console.log(`serving image ${image[0]}...`);
 
     if (image != false) {
-        let labelOptions = task.data.labelOptions
-        res.send( {image, labelOptions} );
+        let labelOptions = task.data.labelOptions;
+        send["image"] = image;
+        send["labelOptions"] = labelOptions;
     }
     else {
-        // res.send( {'error': 'no available images'} );
-        res.status(400).send('No available images');
+        res.status(400);
+        send["error"] = 'No available images';
         throw new Error('No available images');
     }
+    res.send(send);
 })
 
 
