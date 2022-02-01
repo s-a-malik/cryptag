@@ -8,7 +8,7 @@ import {
   Route,
 } from "react-router-dom";
 
-import { TaskCreation } from "./pages";
+import { TaskCreation, TasksPage } from "./pages";
 
 // https://codesandbox.io/s/po6q5?file=/src/routes/AboutPage/AboutPage.tsx - example sandbox
 
@@ -17,6 +17,7 @@ render(
     <Router>
       <Routes>
         <Route path="/" element={<TaskCreation/>} />
+        <Route path="/tasks" element={<TasksPage/>} />
       </Routes>
     </Router>
   </ChakraProvider>, 
