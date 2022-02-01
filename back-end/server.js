@@ -17,11 +17,11 @@ TODO:
 - Add a way to see progress of the consensus (% complete)/payouts for labellers
 - Test everything
 */
-import {ethers} from 'ethers';
+const ethers = require('ethers');
 require('dotenv').config();
 
 // TODO add ABI to artifacts
-import Settlement from './artifacts/contracts/Settlement.sol/Settlement';   
+const Settlement = require('./artifacts/contracts/Settlement.sol/Settlement.json');   
 // TODO need to save private keys in .env
 const provider = new ethers.providers.JsonRpcProvider(process.env.RINKEBY_URL);
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
@@ -29,8 +29,8 @@ const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const express = require('express');
 const app = express();
 const cors = require('cors');
-const { nextTick } = require('process');
 const { assert } = require('console');
+const { nextTick } = require('process');
 const port = 3042;
 
 
@@ -81,7 +81,7 @@ class Task {
         this.labelsByItem = {};
         for (let ind = 0; ind < this.taskSize; ind++) {
             this.labelsByItem[ind] = 0;
-            this.queue.push[ind];
+            this.queue.push(ind);
         }
         this.seen = {};
 
@@ -236,12 +236,11 @@ class Task {
     Returns the next image to be labelled given a labeller address
     */
     getImage(labellerAddress) {
-        seens = this.seen[labellerAddress];
+        let seens = this.seen[labellerAddress];
         if (seens==undefined) {
             seens = [];
             this.seen[labellerAddress] = seens;
         }
-
         for (let id of this.queue) {
             if (!seens.includes(parseInt(id))) {
                 this.seen[labellerAddress].push(parseInt(id));
@@ -265,9 +264,9 @@ activeTasks[0] = new Task(
         example: 'https://picsum.photos/200',
         numLabelsRequired: 3,
         labelOptions: {
-            'road': '0',
-            'person': '1',
-            'field': '2'
+            'road': 0,
+            'person': 1,
+            'field': 2
         },
         status: 'active',
     },
@@ -295,7 +294,7 @@ app.get('/tasks', (req, res) => {
         infoToDisplay.push(activeTasks[key].getTaskInfo());
     }
     // whether to also show completed tasks or not
-    const showCompleted = req.params.showCompleted;
+    const showCompleted = req.query.showCompleted;
     if (showCompleted == 'true') {
         keys = Object.keys(completedTasks);
         for (let key of keys) {
@@ -312,16 +311,21 @@ app.post('/tasks/create-task', (req, res) => {
     const {taskInfo, contract, images} = req.body;
     const taskId = Date.now();    // TODO: decide what to make this
     // create the task
-    active_tasks[taskId] = new Task(taskId, taskInfo, contract, images);
+    activeTasks[taskId] = new Task(taskId, taskInfo, contract, images);
+    
+    // send the taskId back to the client
+    res.send({ taskId });
 });
 
 
 // Serves an image to be labelled for a task given a taskId and labeller address
 // TODO need some security so user's address is used (and verified) in the request - use metamask to provide credential check. 
-app.get('tasks/:taskid/get-next-image', (req, res) => {
-    const {labellerAddress} = req.body;
+app.get('/tasks/:taskId/get-next-image', (req, res) => {
     const {taskId} = req.params;
-    const task = active_tasks[taskId];
+    const {labellerAddress} = req.query;
+    console.log(`Getting next image for task ${taskId} for labeller ${labellerAddress}`);    
+
+    const task = activeTasks[taskId];
 
     // check that the task is active, not already done by user
     try {
@@ -332,6 +336,7 @@ app.get('tasks/:taskid/get-next-image', (req, res) => {
         throw new Error('Task not found');  // needed?
     }
     let image = task.getImage(labellerAddress);
+    console.log(`serving image ${image[0]}...`);
 
     if (image != false) {
         let labelOptions = task.data.labelOptions
@@ -350,31 +355,34 @@ app.get('tasks/:taskid/get-next-image', (req, res) => {
 // TODO need to encrypt this to send across internet?
 // TODO need to prevent this from being submitted multiple times or 
 // called directly without actually doing the labels (security), not important for now.
-app.post('tasks/:taskId/submit-labels', async (req, res) => {
-    console.log('Received a batch of labels...');
+app.post('/tasks/:taskId/submit-labels', async (req, res, next) => {
     const {taskId} = req.params;
-    // unpack request body (labels are a mapping(imageId => label))
+    // unpack request body labels are list of tuples [imageId, labelId]
     const {labellerAddress, labels} = req.body;
+    const send = {};
+    console.log(`Labels received for task ${taskId} by labeller ${labellerAddress}`);
+
     // check task exists
-    try {
-        assert(taskId in activeTasks);
-    }
-    catch(err) {
-        res.status(400).send('Active task not found');
-        throw new Error('Task not found');  // needed?
+    if (!(taskId in activeTasks)) {
+        next(new Error('Task not found'));
+        res.status(400);
+        send["error"] = "Active task not found";
     }
 
     let task = activeTasks[taskId];
     // check all labels are valid
-    try {
-        for (let label of labels) {
-            assert(label[0] < task.taskSize);
-            assert(label[1] < task.keySize);
-        }
-    }
-    catch(err) {
-        res.status(400).send('Invalid label submitted');
-        throw new Error('Invalid label');
+    // try {
+    for (let label of labels) {
+        if (label[0] >= task.taskSize) {
+            next(new Error("Image id out of range"));
+            res.status(400);
+            send["error"] = 'Image id out of range';
+        };
+        if (label[1] >= task.keySize) {
+            next(new Error("Label id out of range"));
+            res.status(400);
+            send["error"] = "Label id out of range";
+        };
     }
 
     task.pushLabels(labellerAddress, labels);
@@ -385,11 +393,16 @@ app.post('tasks/:taskId/submit-labels', async (req, res) => {
         completedTasks[taskId] = task;
         // remove the task from the active tasks
         delete activeTasks[taskId];
-        }
-
+        send["completed"] = `true`;
+    }
+    else {
+        send["complete"] = `false`
+    };
+    // should send more info than this really
+    res.send(send);
 
 });
 
 app.listen(port, () => {
-  console.log(`Listening on port ${port}!`);
+  console.log(`Listening at http://localhost:${port}`);
 });
