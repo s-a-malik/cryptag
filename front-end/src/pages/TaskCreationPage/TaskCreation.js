@@ -69,12 +69,16 @@ export function TaskCreation() {
       funds : values['funds']
     };
 
+    // convert options to array
+    // TODO this looks like a weird data format for options? Shouldn't the option be the value not key?
+    // Why not just an array?
+    const optionsArray = values['options'].split(/\r?\n/);
     const taskInfo = {
       taskName : values['taskName'],
       taskDesription : values['taskDescription'],
       example : values['example'],
       numLabelsRequired : values['numLabels'],
-      labelOptions : values['options'], 
+      labelOptions : optionsArray, 
       status : "active"
     }
     // convert images to array
@@ -184,8 +188,8 @@ export function TaskCreation() {
               required: true,
               })}/>
             <p>{errors.expiryDate?.message}</p>
-          <FormLabel htmlFor='options'>Labelling Options</FormLabel>
-          <Input id='options' placeholder='labelling options' {...register('options', {
+          <FormLabel htmlFor='options'>Labelling Options (one per line)</FormLabel>
+          <Textarea id='options' placeholder='labelling options' {...register('options', {
               required: true,
               })}/>
           <FormErrorMessage>
