@@ -265,7 +265,7 @@ class Task {
 const activeTasks = {};
 const completedTasks = {};
 
-// add an example task
+// add example tasks
 activeTasks[0] = new Task(
     0,
     {
@@ -293,6 +293,43 @@ activeTasks[0] = new Task(
         'https://picsum.photos/400',
     ]
 );
+
+completedTasks[1] = new Task(
+    1,
+    {
+        taskName: 'Test Complete Task',
+        taskDescription: 'This is a test task',
+        example: 'https://picsum.photos/200',
+        numLabelsRequired: 3,
+        labelOptions: {
+            'road': 0,
+            'person': 1,
+            'field': 2
+        },
+        status: 'completed',
+    },
+    {
+        contractAddress: '0x0',
+        setter: '0x0',
+        created: Date.now(),
+        expiry: Date.now() + (1000 * 60 * 60 * 24 * 7),
+        funds: 1,
+    },
+    [
+        'https://picsum.photos/200',
+        'https://picsum.photos/300',
+        'https://picsum.photos/400',
+    ]
+);
+completedTasks[1].data = {
+    "images": completedTasks[1].data.images,
+    "consensusLabels": [0,1,0],
+    "payout": {
+        "0xegrioegn": 0.3,
+        "0xegw3224": 0.3,
+        "0xegw32reg4": 0.4
+    }
+}
 
 // show the tasks available to the front end 
 app.get('/tasks', (req, res) => {
