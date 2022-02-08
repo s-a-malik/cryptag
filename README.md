@@ -2,6 +2,8 @@
 
 Crowdsourcing data labelling tasks on the ethereum blockchain.
 
+Final project for Chainshot OxBridge Bootcamp, Dec 2021 - Jan 2022.
+
 
 ## Front End
 
