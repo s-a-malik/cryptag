@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from "react-router-dom";
 import {
     Flex,
@@ -16,6 +16,9 @@ import {
   import { BsStar, BsStarFill, BsStarHalf } from 'react-icons/bs';
   import { FiShoppingCart, FiStar } from 'react-icons/fi';
   import Header from '../../components/Header'
+import ConnectWalletButton from '../../components/ConnectWalletButton';
+import { UserContext } from '../../lib/UserContext';
+import { getAddress } from '../../lib/metamask';
 
   const ACTIVE = "active"
   const EXPIRED = "expired"
@@ -190,6 +193,12 @@ import {
     useEffect(() => {
         const url = "http://localhost:3042/tasks?showCompleted=true";
         console.log("Fetched")
+
+        const setAddress = async () => {
+          setUser({ address: await getAddress() })
+        }
+        setAddress();
+
         const fetchData = async () => {
             try {
                 const response = await fetch(url, {method: 'GET', headers: {
@@ -220,8 +229,11 @@ import {
         fetchData();
     }, []);
 
+    const { user, setUser } = useContext(UserContext);
+
     return (
       <Box maxW="7xl" mx={'auto'} pt={5} px={{ base: 2, sm: 12, md: 17 }}>
+        <ConnectWalletButton onClick={address => setUser({ address })}/>
         <chakra.h1
           textAlign={'center'}
           fontSize={'4xl'}

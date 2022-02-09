@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useParams } from "react-router-dom";
 import {
     Box,
@@ -9,7 +9,8 @@ import {
     Stack,
     VStack,
     Image,
-    Button
+    Button,
+    chakra
   } from '@chakra-ui/react';
   import {
     FormControl,
@@ -22,6 +23,8 @@ import {
   import {
     Link
   } from "react-router-dom";
+import { UserContext } from '../../lib/UserContext';
+import { getAddress } from '../../lib/metamask';
 
 
   
@@ -41,6 +44,9 @@ import {
     const [taskCompleted, setCompletion] = useState(false)
     const [data, setData] = useState({"imageUrl": IMAGE, "labelOptions": LABEL_OPTIONS, "imageId": 0});
     const [value, setValue] = useState("default")
+
+    // persist user state
+    const { user, setUser } = useContext(UserContext);
 
     const url = `http://localhost:3042/tasks/${params.taskId}/get-next-image?labellerAddress=reg`;
     console.log("Fetched")
@@ -67,13 +73,19 @@ import {
         }
     };
 
+    const setAddress = async () => {
+      setUser({ address: await getAddress() })
+    }
+
+
     useEffect(() => {
+      setAddress();
       fetchData();
   }, []);
 
     async function submitLabel() {
       const body = {
-        labellerAddress: "reg",
+        labellerAddress: user.address,
         labels: [[data.imageId, value]],
       };
 
