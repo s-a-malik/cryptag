@@ -79,6 +79,8 @@ class Task {
             TaskContract.abi,
             wallet
         );
+
+        this.getBalance();
         this.settlementContract = new ethers.Contract(
             this.taskContract.settlement(),
             SettlementContract.abi,
@@ -130,6 +132,12 @@ class Task {
             consensusLabels: [],    // consensus labels for each image (indexed by imageId)
             payout: {}  // map of address => fractional payout
         }
+    }
+
+    async getBalance() {
+        const balance = await provider.getBalance(this.taskContract.address);
+        console.log( await this.taskContract.settlement());
+        console.log(balance);
     }
 
     /*
@@ -309,67 +317,69 @@ const completedTasks = {};
 activeTasks[0] = new Task(
     0,
     {
-        taskName: 'Test Task',
-        taskDescription: 'This is a test task',
-        example: 'https://picsum.photos/200',
+        taskName: 'Dogs or Cats',
+        taskDescription: 'Label which images are dogs and which are cats!',
+        example: 'https://cdn.fotofits.com/petzlover/gallery/img/l/bengal-523511.jpg',
         numLabelsRequired: 3,
         labelOptions: {
-            'road': 0,
-            'person': 1,
-            'field': 2
+            'Dog': 0,
+            'Cat': 1
         },
         status: 'active',
     },
     {
-        contractAddress: '0x0',
-        setter: '0x0',
+        contractAddress: '0x7f31C0949B9d666D8d98253bB5C579AE28FC2e63',
+        setter: '0x859E27407Ed7EA2FaBF8DAD193E4a0F83cFE6CcC',
         created: Date.now(),
         expiry: Date.now() + (1000 * 60 * 60 * 24 * 7),
         funds: 1,
     },
     [
-        'https://picsum.photos/200',
-        'https://picsum.photos/300',
-        'https://picsum.photos/400',
+        'https://wallpapersdsc.net/wp-content/uploads/2016/10/Boxer-Dog-High-Quality-Wallpapers.jpg',
+        'https://www.hdnicewallpapers.com/Walls/Big/Dog/Beautiful_Dog_Puppy_4K_Wallpaper.jpg',
+        'http://2.bp.blogspot.com/-Lx32UOXTRd0/UORN13Ku0WI/AAAAAAAASr8/XLQonS0USvg/s1600/Shetland_Sheepdog_Dog.jpg',
+        'https://blogs.columbian.com/cat-tales/wp-content/uploads/sites/43/2017/02/cat-832583_1920.jpg',
+        'https://2.bp.blogspot.com/-vIzVDMl7WcQ/TmDBPW82iCI/AAAAAAAADzo/jYZ0CQDrXzE/s1600/Orion+%25281%2529.JPG',
+        'https://cdn.fotofits.com/petzlover/gallery/img/l/persian-811129.jpg'
     ]
 );
 
-completedTasks[1] = new Task(
-    1,
-    {
-        taskName: 'Test Complete Task',
-        taskDescription: 'This is a test task',
-        example: 'https://picsum.photos/200',
-        numLabelsRequired: 3,
-        labelOptions: {
-            'road': 0,
-            'person': 1,
-            'field': 2
-        },
-        status: 'completed',
-    },
-    {
-        contractAddress: '0x0',
-        setter: '0x0',
-        created: Date.now(),
-        expiry: Date.now() + (1000 * 60 * 60 * 24 * 7),
-        funds: 1,
-    },
-    [
-        'https://picsum.photos/200',
-        'https://picsum.photos/300',
-        'https://picsum.photos/400',
-    ]
-);
-completedTasks[1].data = {
-    "images": completedTasks[1].data.images,
-    "consensusLabels": [0,1,0],
-    "payout": {
-        "0xegrioegn": 0.3,
-        "0xegw3224": 0.3,
-        "0xegw32reg4": 0.4
-    }
-}
+// completedTasks[1] = new Task(
+//     1,
+//     {
+//         taskName: 'Test Complete Task',
+//         taskDescription: 'This is a test task',
+//         example: 'https://picsum.photos/200',
+//         numLabelsRequired: 3,
+//         labelOptions: {
+//             'road': 0,
+//             'person': 1,
+//             'field': 2
+//         },
+//         status: 'completed',
+//     },
+//     {
+//         contractAddress: '0x0',
+//         setter: '0x0',
+//         created: Date.now(),
+//         expiry: Date.now() + (1000 * 60 * 60 * 24 * 7),
+//         funds: 1,
+//     },
+//     [
+//         'https://picsum.photos/200',
+//         'https://picsum.photos/300',
+//         'https://picsum.photos/400',
+//     ]
+// );
+// completedTasks[1].data = {
+//     "images": completedTasks[1].data.images,
+//     "consensusLabels": [0,1,0],
+//     "payout": {
+//         "0xegrioegn": 0.3,
+//         "0xegw3224": 0.3,
+//         "0xegw32reg4": 0.4
+//     }
+// }
 
 // show the tasks available to the front end 
 app.get('/tasks', (req, res) => {
