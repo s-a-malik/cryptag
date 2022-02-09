@@ -147,6 +147,12 @@ class Task {
         console.log('deposit of', amount, 'from', address);
     }
 
+    async getBalance() {
+        const balance = await provider.getBalance(this.taskContract.address);
+        console.log( await this.taskContract.settlement());
+        console.log(balance);
+    }
+
     /*
     Returns public information about the task in an object
     */
@@ -361,7 +367,6 @@ activeTasks[0] = new Task(
         'https://cdn.fotofits.com/petzlover/gallery/img/l/persian-811129.jpg'
     ]
 );
-
 
 // completedTasks[1] = new Task(
 //     1,

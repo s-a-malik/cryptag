@@ -17,8 +17,8 @@ describe("Settlement", function () {
     Settlement = await ethers.getContractFactory("Settlement");
     settlement = await Settlement.deploy();
     await settlement.deployed();
-    
     [owner, addr, ...addrs] = await ethers.getSigners();
+    console.log(process.env.PRIVATE_KEY);
     settler = new ethers.Wallet(process.env.PRIVATE_KEY, settlement.provider);
     await settlement.provider.send('hardhat_setBalance', [
       settler.address,
@@ -154,6 +154,11 @@ describe("Task", function() {
     expect(taskBalance).to.equal(0);
       
   });
+
+  it("should get settlement address", async function () {
+    const settlementAddress = await task.settlement();
+    expect(settlementAddress).to.equal(settlement.address);
+  })
 
   it("should emit a Settle event", async function () {
     await (await task.connect(addrs[0])
