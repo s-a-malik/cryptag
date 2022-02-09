@@ -17,12 +17,12 @@ TODO:
 - Add a way to see progress of the consensus (% complete)/payouts for labellers
 - Test everything
 */
-import { ethers } from 'ethers';
+const { ethers } = require('ethers');
 require('dotenv').config();
 
 // TODO add ABI to artifacts
-import * as SettlementContract from '../solidity/artifacts/contracts/Settlement.sol/Settlement.json'
-import * as TaskContract from '../solidity/artifacts/contracts/Task.sol/Task.json'
+const SettlementContract = require('../solidity/artifacts/contracts/Settlement.sol/Settlement.json');
+const TaskContract = require('../solidity/artifacts/contracts/Task.sol/Task.json');
 // TODO need to save private keys in .env
 const provider = new ethers.providers.JsonRpcProvider(process.env.RINKEBY_URL);
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
@@ -89,17 +89,26 @@ class Task {
         const settleEvent = {
             address: this.taskContract.address,
             topics: [
-                ethers.utils.id('Settle(uint)'),
+                ethers.utils.id('Settle(uint256)'),
             ]
         };
         const disperseEvent = {
             address: this.settlementContract.address,
             topics: [
-                ethers.utils.id('Deposit(address,uint)'),
+                ethers.utils.id('Disperse(address,uint256)'),
             ]
         };
-        this.settlementContract.on(settleEvent, this.settleContract.bind(this));
-        this.settlementContract.on(disperseEvent, () => { console.log('disperse success!') });
+        const depositEvent = {
+            address: this.taskContract.address,
+            topics: [
+                ethers.utils.id('Deposit(address,uint256)'),
+            ]
+        }
+        provider.on(settleEvent, this.settleContract.bind(this));
+        provider.on(disperseEvent, () => { console.log('disperse success!') });
+        provider.on(depositEvent, (address, amount) => {
+            this.contract.funds += amount;
+        })
 
         this.keySize = Object.keys(taskInfo.labelOptions).length;
         this.taskSize = images.length;
