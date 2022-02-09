@@ -119,33 +119,33 @@ class Task {
             wallet,
         );
         // Register event listeners
-        const settleEvent = {
-            address: this.taskContract.address,
-            topics: [
-                ethers.utils.id('Settle(uint256)'),
-            ]
-        };
-        const disperseEvent = {
-            address: this.settlementContract.address,
-            topics: [
-                ethers.utils.id('Disperse(address,uint256)'),
-            ]
-        };
-        const depositEvent = {
-            address: this.taskContract.address,
-            topics: [
-                ethers.utils.id('Deposit(address,uint256)'),
-            ]
-        };
-        provider.on(settleEvent, this.settleContract.bind(this));
-        provider.on(disperseEvent, () => { console.log('disperse success!') });
-        provider.on(depositEvent, this.updateAmount.bind(this));
+        // const settleEvent = {
+        //     address: this.taskContract.address,
+        //     topics: [
+        //         ethers.utils.id('Settle(uint256)'),
+        //     ]
+        // };
+        // const disperseEvent = {
+        //     address: this.settlementContract.address,
+        //     topics: [
+        //         ethers.utils.id('Disperse(address,uint256)'),
+        //     ]
+        // };
+        // const depositEvent = {
+        //     address: this.taskContract.address,
+        //     topics: [
+        //         ethers.utils.id('Deposit(address,uint256)'),
+        //     ]
+        // };
+        // provider.on(settleEvent, this.settleContract.bind(this));
+        // provider.on(disperseEvent, () => { console.log('disperse success!') });
+        // provider.on(depositEvent, this.updateAmount.bind(this));
     }
 
-    updateAmount(address, amount) {
-        this.contract.funds += amount;
-        console.log('deposit of', amount, 'from', address);
-    }
+    // updateAmount(address, amount) {
+    //     this.contract.funds += amount;
+    //     console.log('deposit of', amount, 'from', address);
+    // }
 
     async getBalance() {
         const balance = await provider.getBalance(this.taskContract.address);
@@ -171,7 +171,7 @@ class Task {
     Also computes the payout for each account.
     TODO change to REP weighted.
     */
-    computeConsenus() {
+    computeConsensus() {
         // if called before enough labels are gathered and not called when expired, reject
         const notExpired = this.contract.expiry > Date.now();
         if (notExpired) {
@@ -285,6 +285,7 @@ class Task {
                 this.labelsByItem[label[0]] += 1;
             }
         }
+        console.log(this.data.labels);
         this.updateQueue();
 
         // add the labeller to the list of labellers
@@ -357,11 +358,11 @@ activeTasks[0] = new Task(
         status: 'active',
     },
     {
-        contractAddress: '0x7f31C0949B9d666D8d98253bB5C579AE28FC2e63',
+        contractAddress: '0xc6bb802E553C1cc4F60043651047A91CDE31B02c',
         setter: '0x859E27407Ed7EA2FaBF8DAD193E4a0F83cFE6CcC',
         created: Date.now(),
         expiry: Date.now() + (1000 * 60 * 60 * 24 * 7),
-        funds: 0.05,
+        funds: 0.09,
     },
     [
         'https://wallpapersdsc.net/wp-content/uploads/2016/10/Boxer-Dog-High-Quality-Wallpapers.jpg',
@@ -435,10 +436,13 @@ app.get('/tasks', (req, res) => {
 app.post('/tasks/create-task', (req, res) => {
     // TODO create contract on client side and send info here 
     const { taskInfo, contract, images } = req.body;
+    console.log(taskInfo);
+    console.log(contract);
+    console.log(images);
     const taskId = Date.now();    // TODO: decide what to make this
     // create the task
     activeTasks[taskId] = new Task(taskId, taskInfo, contract, images);
-    
+    console.log(activeTasks[taskId]);
     // send the taskId back to the client
     res.send({ taskId });
 });
@@ -469,7 +473,7 @@ app.get('/tasks/:taskId/get-next-image', (req, res) => {
         res.send(send);
     }
 
-    console.log(`serving image ${image[0]}...`);
+    console.log(`serving image ${image[0]}, ${image[1]}...`);
 
     if (image) {
         let labelOptions = task.taskInfo.labelOptions;
@@ -522,7 +526,7 @@ app.post('/tasks/:taskId/submit-labels', async (req, res, next) => {
         task.pushLabels(labellerAddress, labels);
 
         // if enough labels have been submitted, complete the task
-        if (task.computeConsenus()) {
+        if (task.computeConsensus()) {
             // add the task to the completed tasks
             completedTasks[taskId] = task;
             // remove the task from the active tasks

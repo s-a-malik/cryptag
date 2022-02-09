@@ -63,11 +63,12 @@ export function TaskCreation() {
     // TODO check what time to use? 
     const signer = provider.getSigner()
     const signerAddress = await signer.getAddress();
+    console.log(values);
     const contractObject = {
-      contractAddress : values.deployedAddress,
+      contractAddress : values.taskAddress,
       setter : signerAddress,
       created : Date.now(),
-      expiry : values['expiryDate'],
+      expiry : Date.parse(values['expiryDate']),
       funds : parseFloat(values['funds'])
     };
 
@@ -82,7 +83,7 @@ export function TaskCreation() {
 
     const taskInfo = {
       taskName : values['taskName'],
-      taskDesription : values['taskDescription'],
+      taskDescription : values['taskDescription'],
       example : values['example'],
       numLabelsRequired : values['numLabels'],
       labelOptions : labelOptions, 
@@ -97,7 +98,7 @@ export function TaskCreation() {
     }
 
     // post to back end
-    alert(JSON.stringify(data));
+    console.log(JSON.stringify(data));
     const requestURL = backendURL + '/tasks/create-task'
 
     const rawResponse = await fetch(requestURL, {
@@ -109,7 +110,6 @@ export function TaskCreation() {
     });
 
     const content = await rawResponse.json();
-    alert(`Task created with id ${content.taskId}`);
     console.log(`Task created with id ${content.taskId}`);
   }
 
@@ -120,7 +120,7 @@ export function TaskCreation() {
   async function deployContract(values)
   { 
     // first deploy settlement
-    alert(values.funds);
+    console.log(values.funds);
     const SettlementFactory = new ethers.ContractFactory(Settlement.abi, Settlement.bytecode, provider.getSigner());
     const settlement = await SettlementFactory.deploy();
     await settlement.deployed();
