@@ -75,7 +75,11 @@ class Task {
         this.taskInfo = taskInfo;
         this.contract = contract;
         // for async
-        this.initContracts();
+        this.initContracts()
+            .then(() => {
+                console.log('registered')
+            })
+            .catch(console.error);
 
         this.keySize = Object.keys(taskInfo.labelOptions).length;
         this.taskSize = images.length;
@@ -114,7 +118,6 @@ class Task {
             SettlementContract.abi,
             wallet,
         );
-        // console.log(this.settlementContract);
         // Register event listeners
         const settleEvent = {
             address: this.taskContract.address,
@@ -136,10 +139,12 @@ class Task {
         };
         provider.on(settleEvent, this.settleContract.bind(this));
         provider.on(disperseEvent, () => { console.log('disperse success!') });
-        provider.on(depositEvent, (address, amount) => {
-            this.contract.funds += amount;
-            console.log("deposited", amount, "to", address);
-        });
+        provider.on(depositEvent, this.updateAmount.bind(this));
+    }
+
+    updateAmount(address, amount) {
+        this.contract.funds += amount;
+        console.log('deposit of', amount, 'from', address);
     }
 
     /*
@@ -198,11 +203,14 @@ class Task {
                 }
             }
         }
+        
 
         // normalise the payout
         for (const [address, payout] of Object.entries(this.data.payout)) {
             this.data.payout[address] /= totalPayout;
         }
+        console.log(`payout: ${JSON.stringify(this.data.payout)}`);
+        console.log(`consensus labels: ${JSON.stringify(this.data.consensusLabels)}`);
 
         // send payout to contract
         this.settleContract();
@@ -440,7 +448,6 @@ app.get('/tasks/:taskId/get-next-image', (req, res) => {
     if (task == undefined) {
         res.status(400);
         send['error'] = 'Task does not exist';
-        throw new Error('Task not found');
     }
     let image = task.getImage(labellerAddress);
     console.log(`serving image ${image[0]}...`);
@@ -453,7 +460,6 @@ app.get('/tasks/:taskId/get-next-image', (req, res) => {
     else {
         res.status(400);
         send["error"] = 'No available images';
-        // throw new Error('No available images');
     }
     res.send(send);
 })
@@ -476,7 +482,7 @@ app.post('/tasks/:taskId/submit-labels', async (req, res, next) => {
     if (task == undefined) {
         res.status(400);
         send['error'] = 'Task does not exist';
-        throw new Error('Task not found');
+        // throw new Error('Task not found');
     }
     else {
         // check all labels are valid
@@ -527,11 +533,11 @@ app.get('/tasks/:taskId/results', (req, res) => {
         const activeTask = activeTasks[taskId];
         if (activeTask == undefined) {
             res.send({'error': 'Task does not exist'});
-            throw new Error('Task not found');
+            // throw new Error('Task not found');
         }
         else {
             res.send({'error': 'Task not complete'});
-            throw new Error('Task not complete');
+            // throw new Error('Task not complete');
         }
     }
     else {
