@@ -250,11 +250,16 @@ class Task {
     
             // send funds to address
             const outAmount = this.data.payout[address] * contractBalance;
-            console.log(`Payed out ${outAmount} to ${address}`);
-            const tx = await this.settlementContract.disperse(address, ethers.utils.parseEther(`${outAmount}`));
-            // console.log(tx); // will have the details of the transaction pre-mining. 
-            await tx.wait();    // wait for the mine
-            console.log(`Tx hash for sending payment to ${address}: ${tx.hash}`);
+            console.log(`Paying out ${outAmount} to ${address}`);
+            try {
+                const tx = await this.settlementContract.disperse(address, `${outAmount}`);
+                // console.log(tx); // will have the details of the transaction pre-mining. 
+                await tx.wait();    // wait for the mine
+                console.log(`Tx hash for sending payment to ${address}: ${tx.hash}`);
+            }
+            catch {
+                console.log(`Error sending payment to ${address}`);
+            }
         }
         console.log("settled!");
     }
@@ -454,7 +459,16 @@ app.get('/tasks/:taskId/get-next-image', (req, res) => {
         res.status(400);
         send['error'] = 'Task does not exist';
     }
-    let image = task.getImage(labellerAddress);
+    let image;
+    try {
+        image = task.getImage(labellerAddress);
+    }
+    catch (e) {
+        res.status(400);
+        send['error'] = e;
+        res.send(send);
+    }
+
     console.log(`serving image ${image[0]}...`);
 
     if (image) {
@@ -523,7 +537,6 @@ app.post('/tasks/:taskId/submit-labels', async (req, res, next) => {
     res.send(send);
 
 });
-
 
 /*
 Allow people to see the results of completed tasks
