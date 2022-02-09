@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from "react-router-dom";
 import {
     Flex,
     Circle,
@@ -30,6 +31,10 @@ import {
         exampleUrl: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=4600&q=80",
         numLabelsRequired: 34,
         status: "active"
+      },
+      contract: {
+        contractAddress: 'test',
+        funds: 5
       }
     },
     {
@@ -41,6 +46,10 @@ import {
         exampleUrl: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=4600&q=80",
         numLabelsRequired: 34,
         status: "expired"
+      },
+      contract: {
+        contractAddress: 'test',
+        funds: 5
       }
     },
     {
@@ -52,6 +61,10 @@ import {
         exampleUrl: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=4600&q=80",
         numLabelsRequired: 34,
         status: "completed"
+      },
+      contract: {
+        contractAddress: 'test',
+        funds: 5
       }
     },
 
@@ -86,6 +99,8 @@ import {
   }
   
   function TaskCard({data}) {
+    let navigate = useNavigate()
+
     function getColor(status) {
       switch (status) {
         case ACTIVE: return "yellow"
@@ -94,9 +109,15 @@ import {
       }
     }
 
+    async function handleClick(event) {
+      event.preventDefault()
+      navigate(`/tasks/${data.taskId}`, {replace: true})
+    }
+
+    console.log(data)
     return (
       <Flex p={50} w="full" alignItems="center" justifyContent="center">
-        <Box
+        <Box onClick={handleClick}
           bg={useColorModeValue('white', 'gray.800')}
           maxW="sm"
           borderWidth="1px"
@@ -154,7 +175,7 @@ import {
                 <Box as="span" color={'gray.600'} fontSize="lg">
                   ETH
                 </Box>
-                {data.taskSize.toFixed(2)}
+                {data.contract.funds.toFixed(2)}
               </Box>
             </Flex>
           </Box>
@@ -166,35 +187,38 @@ import {
   export function TasksPage() {
     const [data, setData] = useState(testData);
 
-  // useEffect(() => {
-  //     const url = "http://localhost:3042";
-  //     console.log("Fethced")
-  //     const fetchData = async () => {
-  //         try {
-  //             // const response = await fetch(url, {method: 'GET', headers: {
-  //             //   'Content-Type': 'application/json'
-  //             // }});
-  //             // const responseData = await response.json();
-  //             setData([testData])
-  //             console.log(data)
-  //             // setData(data.map(el => ({
-  //             //   taskId: el.taskId,
-  //             //   taskSize: el.taskSize, 
-  //             //   taskInfo: {
-  //             //     taskName: el.taskInfo.taskName,
-  //             //     taskDesc: el.taskInfo.taskDescription,
-  //             //     exampleUrl: el.taskInfo.example,
-  //             //     numLabelsRequired: el.taskInfo.numLabelsRequired,
-  //             //     status: el.taskInfo.status
-  //             //   }
-  //             // })));
-  //         } catch (error) {
-  //             console.log("error", error);
-  //         }
-  //     };
+    useEffect(() => {
+        const url = "http://localhost:3042/tasks?showCompleted=true";
+        console.log("Fetched")
+        const fetchData = async () => {
+            try {
+                const response = await fetch(url, {method: 'GET', headers: {
+                  'Content-Type': 'application/json'
+                }});
+                const responseData = await response.json();
+                console.log(responseData.infoToDisplay)
+                setData(responseData.infoToDisplay.map(el => ({
+                  taskId: el.taskId,
+                  taskSize: el.taskSize, 
+                  taskInfo: {
+                    taskName: el.taskInfo.taskName,
+                    taskDesc: el.taskInfo.taskDescription,
+                    exampleUrl: el.taskInfo.example,
+                    numLabelsRequired: el.taskInfo.numLabelsRequired,
+                    status: el.taskInfo.status
+                  },
+                  contract: {
+                    contractAddress: el.contract.contractAddress,
+                    funds: el.contract.funds
+                  }
+                })));
+            } catch (error) {
+                console.log("error", error);
+            }
+        };
 
-  //     fetchData();
-  // }, [data]);
+        fetchData();
+    }, []);
 
     return (
       <Box maxW="7xl" mx={'auto'} pt={5} px={{ base: 2, sm: 12, md: 17 }}>

@@ -384,15 +384,15 @@ app.get('/tasks/:taskId/get-next-image', (req, res) => {
     let image = task.getImage(labellerAddress);
     console.log(`serving image ${image[0]}...`);
 
-    if (image != false) {
-        let labelOptions = task.data.labelOptions;
+    if (image) {
+        let labelOptions = task.taskInfo.labelOptions;
         send["image"] = image;
         send["labelOptions"] = labelOptions;
     }
     else {
         res.status(400);
         send["error"] = 'No available images';
-        throw new Error('No available images');
+        // throw new Error('No available images');
     }
     res.send(send);
 })
