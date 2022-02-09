@@ -13,9 +13,9 @@ import {
     SimpleGrid,
     Heading
   } from '@chakra-ui/react';
-  import { BsStar, BsStarFill, BsStarHalf } from 'react-icons/bs';
-  import { FiShoppingCart, FiStar } from 'react-icons/fi';
-  import Header from '../../components/Header'
+import { BsStar, BsStarFill, BsStarHalf } from 'react-icons/bs';
+import { FiShoppingCart, FiStar } from 'react-icons/fi';
+import Header from '../../components/Header'
 import ConnectWalletButton from '../../components/ConnectWalletButton';
 import { UserContext } from '../../lib/UserContext';
 
@@ -24,52 +24,51 @@ import { UserContext } from '../../lib/UserContext';
   const COMPLETED = "completed"
   
   const testData = [
-    {
-      taskId: 1,
-      taskSize: 34, 
-      taskInfo: {
-        taskName: "Wayfarer Classic",
-        taskDesc: "Still awaiting",
-        exampleUrl: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=4600&q=80",
-        numLabelsRequired: 34,
-        status: "active"
-      },
-      contract: {
-        contractAddress: 'test',
-        funds: 5
-      }
-    },
-    {
-      taskId: 2,
-      taskSize: 34, 
-      taskInfo: {
-        taskName: "Wayfarer Classic 2",
-        taskDesc: "Still awaiting",
-        exampleUrl: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=4600&q=80",
-        numLabelsRequired: 34,
-        status: "expired"
-      },
-      contract: {
-        contractAddress: 'test',
-        funds: 5
-      }
-    },
-    {
-      taskId: 3,
-      taskSize: 34, 
-      taskInfo: {
-        taskName: "Wayfarer Classic 2",
-        taskDesc: "Still awaiting",
-        exampleUrl: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=4600&q=80",
-        numLabelsRequired: 34,
-        status: "completed"
-      },
-      contract: {
-        contractAddress: 'test',
-        funds: 5
-      }
-    },
-
+//     {
+//       taskId: 1,
+//       taskSize: 34, 
+//       taskInfo: {
+//         taskName: "Wayfarer Classic",
+//         taskDesc: "Still awaiting",
+//         exampleUrl: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=4600&q=80",
+//         numLabelsRequired: 34,
+//         status: "active"
+//       },
+//       contract: {
+//         contractAddress: 'test',
+//         funds: 5
+//       }
+//     },
+//     {
+//       taskId: 2,
+//       taskSize: 34, 
+//       taskInfo: {
+//         taskName: "Wayfarer Classic 2",
+//         taskDesc: "Still awaiting",
+//         exampleUrl: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=4600&q=80",
+//         numLabelsRequired: 34,
+//         status: "expired"
+//       },
+//       contract: {
+//         contractAddress: 'test',
+//         funds: 5
+//       }
+//     },
+//     {
+//       taskId: 3,
+//       taskSize: 34, 
+//       taskInfo: {
+//         taskName: "Wayfarer Classic 2",
+//         taskDesc: "Still awaiting",
+//         exampleUrl: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=4600&q=80",
+//         numLabelsRequired: 34,
+//         status: "completed"
+//       },
+//       contract: {
+//         contractAddress: 'test',
+//         funds: 5
+//       }
+//     },
 ];
   
   function Rating({ rating, numTasks }) {
