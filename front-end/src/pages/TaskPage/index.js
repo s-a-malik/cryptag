@@ -42,7 +42,7 @@ import { getAddress } from '../../lib/metamask';
     let params = useParams()
     console.log(params)
     const [taskCompleted, setCompletion] = useState(false)
-    const [data, setData] = useState({"imageUrl": IMAGE, "labelOptions": LABEL_OPTIONS, "imageId": 0});
+    const [data, setData] = useState({"imageUrl": "", "labelOptions": {}, "imageId": 0});
     const [value, setValue] = useState("default")
 
     // persist user state
