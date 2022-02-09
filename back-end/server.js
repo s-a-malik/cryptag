@@ -73,9 +73,9 @@ class Task {
     constructor(taskId, taskInfo, contract, images) {
         this.taskId = taskId;
         this.taskInfo = taskInfo;
-        // this.contract = contract;
+        this.contract = contract;
         this.taskContract = new ethers.Contract(
-            contract,
+            contract.contractAddress,
             TaskContract.abi,
             wallet
         );
@@ -205,11 +205,11 @@ class Task {
         // TODO error catching
         console.log("Paying out contract");
         // const settlement = new ethers.Contract(this.contract.contractAddress, Settlement.abi, wallet);
-
+        const contractBalance = this.settlementContract.getBalance();
         // iterate through payout and send funds*payout to each address
         for (let address in this.data.payout) {
             // send funds to address
-            const outAmount = this.data.payout[address] * this.settlementContract.getBalance();
+            const outAmount = this.data.payout[address] * contractBalance;
             const tx = await this.settlementContract.disperse(address, ethers.utils.parseEther(`${outAmount}`));
             // console.log(tx); // will have the details of the transaction pre-mining. 
             await tx.wait();    // wait for the mine
