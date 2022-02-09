@@ -256,7 +256,9 @@ class Task {
         return {
             images: this.data.images,
             consensusLabels: this.data.consensusLabels,
-            labelOptions: this.taskInfo.labelOptions
+            payout: this.data.payout,
+            labelOptions: this.taskInfo.labelOptions,
+            funds: this.contract.funds,
         }
     }
 }
