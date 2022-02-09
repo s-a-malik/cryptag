@@ -1,5 +1,6 @@
 const { ethers } = require('hardhat');
 const { expect } = require('chai');
+require('dotenv').config();
 const numberSort = (x, y) => Number(x) - Number(y);
 const isNumber = (x) => !isNaN(Number(x));
 const toArray = (x) => Object.keys(x).filter(isNumber).sort(numberSort).reduce((a, k) => a.concat(x[k]), []);
@@ -8,6 +9,7 @@ describe("Settlement", function () {
   let Settlement;
   let settlement;
   let owner;
+  let settler;
   let addr;
   let addrs;
 
@@ -17,6 +19,11 @@ describe("Settlement", function () {
     await settlement.deployed();
     
     [owner, addr, ...addrs] = await ethers.getSigners();
+    settler = new ethers.Wallet(process.env.PRIVATE_KEY, settlement.provider);
+    await settlement.provider.send('hardhat_setBalance', [
+      settler.address,
+      "0x1000000000000000000000", // 1000 ETH
+    ])
   });
 
   it("should receive funds", async function () {
@@ -42,7 +49,7 @@ describe("Settlement", function () {
     await settlement.connect(addrs[0])
       .deposit({value: ethers.utils.parseEther("1")});
 
-    await settlement.connect(owner)
+    await settlement.connect(settler)
       .disperse(addr.address, ethers.utils.parseEther("0.1"));
 
     let newAddrBalance = await settlement.provider.getBalance(addr.address);
@@ -55,7 +62,7 @@ describe("Settlement", function () {
 
     await settlement.connect(addrs[0])
       .deposit({value: ethers.utils.parseEther("1")}); 
-    const response = await settlement.connect(owner)
+    const response = await settlement.connect(settler)
       .disperse(addr.address, ethers.utils.parseEther("0.1")); 
     const logs = await response.wait() 
     const disperse = logs.events.find(x => x.event === "Disperse");
@@ -81,7 +88,7 @@ describe("Settlement", function () {
   it('should revert if the transaction fails', async () => {
     let ex;
     try {
-      await settlement.connect(owner)
+      await settlement.connect(settler)
       .disperse(addr.address, ethers.utils.parseEther("0.1")); 
     }
     catch(_ex) {
@@ -98,6 +105,7 @@ describe("Task", function() {
   let Task;
   let task
   let owner;
+  let settler;
   let addr;
   let addrs;
   let getBalance;
@@ -112,7 +120,11 @@ describe("Task", function() {
     await task.deployed();
     
     [owner, addr, ...addrs] = await ethers.getSigners();
-
+    settler = new ethers.Wallet(process.env.PRIVATE_KEY, settlement.provider);
+    await settlement.provider.send('hardhat_setBalance', [
+      settler.address,
+      "0x1000000000000000000000", // 1000 ETH
+    ])
     getBalance = async (acct) => {
       return Number(
         ethers.utils.formatEther(
@@ -131,7 +143,7 @@ describe("Task", function() {
     let taskBalance = await getBalance(task);
     expect(taskBalance).to.be.greaterThan(0);
 
-    const settle = await task.connect(owner).settle();
+    const settle = await task.connect(settler).settle();
     await settle.wait();
 
     const balance = await getBalance(settlement);
@@ -146,7 +158,7 @@ describe("Task", function() {
     await (await task.connect(addrs[0])
       .deposit({value: ethers.utils.parseEther("1")}))
       .wait();
-    const response = await task.connect(owner).settle();
+    const response = await task.connect(settler).settle();
     const logs = await response.wait();
     const settle = logs.events.find(x => x.event === "Settle");
     expect(settle, "Expected a Settle event to be emitted!").not.to.equal(undefined);
