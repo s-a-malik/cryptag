@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form'
 import Header from '../../components/Header'
-import ConnectWalletButton from '../../components/ConnectWalletButton'
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from "yup";
 import "./TaskCreation.css";
@@ -25,6 +24,7 @@ import {
   FormErrorMessage,
   FormHelperText,
   Stack,
+  chakra
 } from '@chakra-ui/react'
 
 // TODO change for production
@@ -144,7 +144,13 @@ export function TaskCreation() {
 // TODO allow for options 
   return (
     <div className='wrapper'>
-    <Header title="Task Creation" />
+            <chakra.h1
+          textAlign={'center'}
+          fontSize={'4xl'}
+          py={10}
+          fontWeight={'bold'}>
+          Task Creation
+        </chakra.h1>
     <div className='task-creation-app'>
         <Stack >
         <form onSubmit={handleSubmit(onSubmit)}>
