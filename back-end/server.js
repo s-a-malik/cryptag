@@ -74,43 +74,12 @@ class Task {
         this.taskId = taskId;
         this.taskInfo = taskInfo;
         this.contract = contract;
-        this.taskContract = new ethers.Contract(
-            contract.contractAddress,
-            TaskContract.abi,
-            wallet
-        );
-
-        this.getBalance();
-        this.settlementContract = new ethers.Contract(
-            this.taskContract.settlement(),
-            SettlementContract.abi,
-            wallet,
-        );
-
-        // Register event listeners
-        const settleEvent = {
-            address: this.taskContract.address,
-            topics: [
-                ethers.utils.id('Settle(uint256)'),
-            ]
-        };
-        const disperseEvent = {
-            address: this.settlementContract.address,
-            topics: [
-                ethers.utils.id('Disperse(address,uint256)'),
-            ]
-        };
-        const depositEvent = {
-            address: this.taskContract.address,
-            topics: [
-                ethers.utils.id('Deposit(address,uint256)'),
-            ]
-        }
-        provider.on(settleEvent, this.settleContract.bind(this));
-        provider.on(disperseEvent, () => { console.log('disperse success!') });
-        provider.on(depositEvent, (address, amount) => {
-            this.contract.funds += amount;
-        })
+        // for async
+        this.initContracts()
+            .then(() => {
+                console.log('registered')
+            })
+            .catch(console.error);
 
         this.keySize = Object.keys(taskInfo.labelOptions).length;
         this.taskSize = images.length;
@@ -133,6 +102,50 @@ class Task {
             payout: {}  // map of address => fractional payout
         }
     }
+
+    async initContracts() {
+        this.taskContract = new ethers.Contract(
+            this.contract.contractAddress,
+            TaskContract.abi,
+            wallet
+        );
+        const balance = await provider.getBalance(this.taskContract.address);
+        console.log(balance);
+        const settlementAddress = await this.taskContract.settlement();
+        console.log(settlementAddress);
+        this.settlementContract = new ethers.Contract(
+            this.taskContract.settlement(),
+            SettlementContract.abi,
+            wallet,
+        );
+        // Register event listeners
+        // const settleEvent = {
+        //     address: this.taskContract.address,
+        //     topics: [
+        //         ethers.utils.id('Settle(uint256)'),
+        //     ]
+        // };
+        // const disperseEvent = {
+        //     address: this.settlementContract.address,
+        //     topics: [
+        //         ethers.utils.id('Disperse(address,uint256)'),
+        //     ]
+        // };
+        // const depositEvent = {
+        //     address: this.taskContract.address,
+        //     topics: [
+        //         ethers.utils.id('Deposit(address,uint256)'),
+        //     ]
+        // };
+        // provider.on(settleEvent, this.settleContract.bind(this));
+        // provider.on(disperseEvent, () => { console.log('disperse success!') });
+        // provider.on(depositEvent, this.updateAmount.bind(this));
+    }
+
+    // updateAmount(address, amount) {
+    //     this.contract.funds += amount;
+    //     console.log('deposit of', amount, 'from', address);
+    // }
 
     async getBalance() {
         const balance = await provider.getBalance(this.taskContract.address);
@@ -158,7 +171,7 @@ class Task {
     Also computes the payout for each account.
     TODO change to REP weighted.
     */
-    computeConsenus() {
+    computeConsensus() {
         // if called before enough labels are gathered and not called when expired, reject
         const notExpired = this.contract.expiry > Date.now();
         if (notExpired) {
@@ -196,11 +209,14 @@ class Task {
                 }
             }
         }
+        
 
         // normalise the payout
         for (const [address, payout] of Object.entries(this.data.payout)) {
             this.data.payout[address] /= totalPayout;
         }
+        console.log(`payout: ${JSON.stringify(this.data.payout)}`);
+        console.log(`consensus labels: ${JSON.stringify(this.data.consensusLabels)}`);
 
         // send payout to contract
         this.settleContract();
@@ -222,15 +238,28 @@ class Task {
         // TODO error catching
         console.log("Paying out contract");
         // const settlement = new ethers.Contract(this.contract.contractAddress, Settlement.abi, wallet);
-        const contractBalance = this.settlementContract.getBalance();
+        const tx = await this.taskContract.settle();
+        await tx.wait();
+        // should have sent funds to settlement contract now
+        const contractBalance = await this.settlementContract.getBalance();
+        console.log(contractBalance); // check settlement contract has received funds
+        console.log(this.data.payout);
+
         // iterate through payout and send funds*payout to each address
         for (let address in this.data.payout) {
+    
             // send funds to address
             const outAmount = this.data.payout[address] * contractBalance;
-            const tx = await this.settlementContract.disperse(address, ethers.utils.parseEther(`${outAmount}`));
-            // console.log(tx); // will have the details of the transaction pre-mining. 
-            await tx.wait();    // wait for the mine
-            console.log(`Tx hash for sending payment to ${address}: ${tx.hash}`);
+            console.log(`Paying out ${outAmount} to ${address}`);
+            try {
+                const tx = await this.settlementContract.disperse(address, `${outAmount}`);
+                // console.log(tx); // will have the details of the transaction pre-mining. 
+                await tx.wait();    // wait for the mine
+                console.log(`Tx hash for sending payment to ${address}: ${tx.hash}`);
+            }
+            catch {
+                console.log(`Error sending payment to ${address}`);
+            }
         }
         console.log("settled!");
     }
@@ -256,6 +285,7 @@ class Task {
                 this.labelsByItem[label[0]] += 1;
             }
         }
+        console.log(this.data.labels);
         this.updateQueue();
 
         // add the labeller to the list of labellers
@@ -328,11 +358,11 @@ activeTasks[0] = new Task(
         status: 'active',
     },
     {
-        contractAddress: '0x7f31C0949B9d666D8d98253bB5C579AE28FC2e63',
+        contractAddress: '0x4f0cb04612Cc4E877C03E17Ab486CD966bcf1cE4',
         setter: '0x859E27407Ed7EA2FaBF8DAD193E4a0F83cFE6CcC',
         created: Date.now(),
         expiry: Date.now() + (1000 * 60 * 60 * 24 * 7),
-        funds: 1,
+        funds: 0.12,
     },
     [
         'https://wallpapersdsc.net/wp-content/uploads/2016/10/Boxer-Dog-High-Quality-Wallpapers.jpg',
@@ -406,10 +436,13 @@ app.get('/tasks', (req, res) => {
 app.post('/tasks/create-task', (req, res) => {
     // TODO create contract on client side and send info here 
     const { taskInfo, contract, images } = req.body;
+    console.log(taskInfo);
+    console.log(contract);
+    console.log(images);
     const taskId = Date.now();    // TODO: decide what to make this
     // create the task
     activeTasks[taskId] = new Task(taskId, taskInfo, contract, images);
-    
+    console.log(activeTasks[taskId]);
     // send the taskId back to the client
     res.send({ taskId });
 });
@@ -429,10 +462,18 @@ app.get('/tasks/:taskId/get-next-image', (req, res) => {
     if (task == undefined) {
         res.status(400);
         send['error'] = 'Task does not exist';
-        throw new Error('Task not found');
     }
-    let image = task.getImage(labellerAddress);
-    console.log(`serving image ${image[0]}...`);
+    let image;
+    try {
+        image = task.getImage(labellerAddress);
+    }
+    catch (e) {
+        res.status(400);
+        send['error'] = e;
+        res.send(send);
+    }
+
+    console.log(`serving image ${image[0]}, ${image[1]}...`);
 
     if (image) {
         let labelOptions = task.taskInfo.labelOptions;
@@ -442,7 +483,6 @@ app.get('/tasks/:taskId/get-next-image', (req, res) => {
     else {
         res.status(400);
         send["error"] = 'No available images';
-        // throw new Error('No available images');
     }
     res.send(send);
 })
@@ -465,7 +505,7 @@ app.post('/tasks/:taskId/submit-labels', async (req, res, next) => {
     if (task == undefined) {
         res.status(400);
         send['error'] = 'Task does not exist';
-        throw new Error('Task not found');
+        // throw new Error('Task not found');
     }
     else {
         // check all labels are valid
@@ -486,7 +526,7 @@ app.post('/tasks/:taskId/submit-labels', async (req, res, next) => {
         task.pushLabels(labellerAddress, labels);
 
         // if enough labels have been submitted, complete the task
-        if (task.computeConsenus()) {
+        if (task.computeConsensus()) {
             // add the task to the completed tasks
             completedTasks[taskId] = task;
             // remove the task from the active tasks
@@ -502,7 +542,6 @@ app.post('/tasks/:taskId/submit-labels', async (req, res, next) => {
 
 });
 
-
 /*
 Allow people to see the results of completed tasks
 Currently an open source dataset as we allow funders to contribute but we could restrict this to only funders 
@@ -516,11 +555,11 @@ app.get('/tasks/:taskId/results', (req, res) => {
         const activeTask = activeTasks[taskId];
         if (activeTask == undefined) {
             res.send({'error': 'Task does not exist'});
-            throw new Error('Task not found');
+            // throw new Error('Task not found');
         }
         else {
             res.send({'error': 'Task not complete'});
-            throw new Error('Task not complete');
+            // throw new Error('Task not complete');
         }
     }
     else {

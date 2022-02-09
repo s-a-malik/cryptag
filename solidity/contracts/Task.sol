@@ -34,4 +34,8 @@ contract Task {
     require(sent, 'Failed to settle funds');
     emit Settle(_amount); // or address(this).balance
   }
+
+  function getSettlementAddress() public view returns (address) {
+    return settlement;
+  }
 }
