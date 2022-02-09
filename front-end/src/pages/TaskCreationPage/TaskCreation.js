@@ -84,7 +84,7 @@ export function TaskCreation() {
     // convert images to array
     const imagesArray = values['images'].split(/\r?\n/);
     const data  = {
-      contractObject : contractObject,
+      contract : contractObject,
       taskInfo : taskInfo,
       images : imagesArray
     }

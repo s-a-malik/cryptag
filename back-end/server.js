@@ -17,11 +17,12 @@ TODO:
 - Add a way to see progress of the consensus (% complete)/payouts for labellers
 - Test everything
 */
-const ethers = require('ethers');
+const { ethers } = require('ethers');
 require('dotenv').config();
 
 // TODO add ABI to artifacts
-const Settlement = require('./artifacts/contracts/Settlement.sol/Settlement.json');   
+const SettlementContract = require('../solidity/artifacts/contracts/Settlement.sol/Settlement.json');
+const TaskContract = require('../solidity/artifacts/contracts/Task.sol/Task.json');
 // TODO need to save private keys in .env
 const provider = new ethers.providers.JsonRpcProvider(process.env.RINKEBY_URL);
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
@@ -73,10 +74,45 @@ class Task {
         this.taskId = taskId;
         this.taskInfo = taskInfo;
         this.contract = contract;
+        this.taskContract = new ethers.Contract(
+            contract.contractAddress,
+            TaskContract.abi,
+            wallet
+        );
+        this.settlementContract = new ethers.Contract(
+            this.taskContract.settlement(),
+            SettlementContract.abi,
+            wallet,
+        );
+
+        // Register event listeners
+        const settleEvent = {
+            address: this.taskContract.address,
+            topics: [
+                ethers.utils.id('Settle(uint256)'),
+            ]
+        };
+        const disperseEvent = {
+            address: this.settlementContract.address,
+            topics: [
+                ethers.utils.id('Disperse(address,uint256)'),
+            ]
+        };
+        const depositEvent = {
+            address: this.taskContract.address,
+            topics: [
+                ethers.utils.id('Deposit(address,uint256)'),
+            ]
+        }
+        provider.on(settleEvent, this.settleContract.bind(this));
+        provider.on(disperseEvent, () => { console.log('disperse success!') });
+        provider.on(depositEvent, (address, amount) => {
+            this.contract.funds += amount;
+        })
 
         this.keySize = Object.keys(taskInfo.labelOptions).length;
         this.taskSize = images.length;
-       
+
         this.queue = [];
         this.labelsByItem = {};
         for (let ind = 0; ind < this.taskSize; ind++) {
@@ -130,7 +166,7 @@ class Task {
 
         // try to find a consensus for each image
         let totalPayout = 0;
-        for (let address of this.data.labellers) {this.data.payout[address]=0;}
+        for (let address of this.data.labellers) { this.data.payout[address] = 0; }
 
         // iterate through each image
         for (let id = 0; id < this.taskSize; id++) {
@@ -145,7 +181,7 @@ class Task {
             // add to consensus label list
             this.data.consensusLabels[id] = consensusLabel;
             // add consensus labels to payout for that address
-            for (const [address, label] of Object.entries(this.data.labels[id]) ) {
+            for (const [address, label] of Object.entries(this.data.labels[id])) {
                 if (label == consensusLabel) {
                     this.data.payout[address] += 1;
                     totalPayout += 1;
@@ -177,15 +213,16 @@ class Task {
         // TODO should sync updates about contract funds from blockchain
         // TODO error catching
         console.log("Paying out contract");
-        const settlement = new ethers.Contract(this.contract.contractAddress, Settlement.abi, wallet);
-
+        // const settlement = new ethers.Contract(this.contract.contractAddress, Settlement.abi, wallet);
+        const contractBalance = this.settlementContract.getBalance();
         // iterate through payout and send funds*payout to each address
         for (let address in this.data.payout) {
             // send funds to address
-            const tx = await settlement.disperse(this.data.payout[address], ethers.utils.parseEther(`${this.data.payout[address]*this.contract.funds}`));
+            const outAmount = this.data.payout[address] * contractBalance;
+            const tx = await this.settlementContract.disperse(address, ethers.utils.parseEther(`${outAmount}`));
             // console.log(tx); // will have the details of the transaction pre-mining. 
             await tx.wait();    // wait for the mine
-            console.log(`Tx hash for sending payment to ${this.data.payout[address]}: ${tx.hash}`);
+            console.log(`Tx hash for sending payment to ${address}: ${tx.hash}`);
         }
         console.log("settled!");
     }
@@ -203,7 +240,7 @@ class Task {
             if (!(label[0] in this.data.labels)) {
                 this.data.labels[label[0]] = {};
             }
-            
+
             // check this labeller hasn't already labelled this image
             // if they have, just ignore it entirely for now
             if (this.data.labels[label[0]][labellerAddress] == undefined) {
@@ -223,10 +260,10 @@ class Task {
     */
     updateQueue() {
         let temp = this.labelsByItem;
-        this.queue = Object.keys(this.labelsByItem).map(function(key) {
+        this.queue = Object.keys(this.labelsByItem).map(function (key) {
             return [key, temp[key]];
         });
-        this.queue.sort(function(a,b) {return a[1]-b[1];});
+        this.queue.sort(function (a, b) { return a[1] - b[1]; });
         for (let x in this.queue) {
             this.queue[x] = this.queue[x][0];
         }
@@ -244,18 +281,31 @@ class Task {
         for (let id of this.queue) {
             if (!seens.includes(parseInt(id))) {
                 this.seen[labellerAddress].push(parseInt(id));
-                return [id, this.data.images[id]];}
+                return [id, this.data.images[id]];
+            }
         };
         return false;
     }
 
+    /*
+    Returns the images and consensus labels for a completed task
+    */
+    getResults() {
+        return {
+            images: this.data.images,
+            consensusLabels: this.data.consensusLabels,
+            payout: this.data.payout,
+            labelOptions: this.taskInfo.labelOptions,
+            funds: this.contract.funds,
+        }
+    }
 }
 
 // current and completed task objects for storage, to be indexed by taskId
 const activeTasks = {};
 const completedTasks = {};
 
-// add an example task
+// add example tasks
 activeTasks[0] = new Task(
     0,
     {
@@ -284,6 +334,43 @@ activeTasks[0] = new Task(
     ]
 );
 
+completedTasks[1] = new Task(
+    1,
+    {
+        taskName: 'Test Complete Task',
+        taskDescription: 'This is a test task',
+        example: 'https://picsum.photos/200',
+        numLabelsRequired: 3,
+        labelOptions: {
+            'road': 0,
+            'person': 1,
+            'field': 2
+        },
+        status: 'completed',
+    },
+    {
+        contractAddress: '0x0',
+        setter: '0x0',
+        created: Date.now(),
+        expiry: Date.now() + (1000 * 60 * 60 * 24 * 7),
+        funds: 1,
+    },
+    [
+        'https://picsum.photos/200',
+        'https://picsum.photos/300',
+        'https://picsum.photos/400',
+    ]
+);
+completedTasks[1].data = {
+    "images": completedTasks[1].data.images,
+    "consensusLabels": [0,1,0],
+    "payout": {
+        "0xegrioegn": 0.3,
+        "0xegw3224": 0.3,
+        "0xegw32reg4": 0.4
+    }
+}
+
 // show the tasks available to the front end 
 app.get('/tasks', (req, res) => {
     // only show task info, not the data
@@ -298,7 +385,7 @@ app.get('/tasks', (req, res) => {
     if (showCompleted == 'true') {
         keys = Object.keys(completedTasks);
         for (let key of keys) {
-        infoToDisplay.push(completedTasks[key].getTaskInfo());
+            infoToDisplay.push(completedTasks[key].getTaskInfo());
         }
     }
 
@@ -308,7 +395,7 @@ app.get('/tasks', (req, res) => {
 // create a new task
 app.post('/tasks/create-task', (req, res) => {
     // TODO create contract on client side and send info here 
-    const {taskInfo, contract, images} = req.body;
+    const { taskInfo, contract, images } = req.body;
     const taskId = Date.now();    // TODO: decide what to make this
     // create the task
     activeTasks[taskId] = new Task(taskId, taskInfo, contract, images);
@@ -337,15 +424,15 @@ app.get('/tasks/:taskId/get-next-image', (req, res) => {
     let image = task.getImage(labellerAddress);
     console.log(`serving image ${image[0]}...`);
 
-    if (image != false) {
-        let labelOptions = task.data.labelOptions;
+    if (image) {
+        let labelOptions = task.taskInfo.labelOptions;
         send["image"] = image;
         send["labelOptions"] = labelOptions;
     }
     else {
         res.status(400);
         send["error"] = 'No available images';
-        throw new Error('No available images');
+        // throw new Error('No available images');
     }
     res.send(send);
 })
@@ -362,46 +449,73 @@ app.post('/tasks/:taskId/submit-labels', async (req, res, next) => {
     const {labellerAddress, labels} = req.body;
     const send = {};
     console.log(`Labels received for task ${taskId} by labeller ${labellerAddress}`);
-
-    // check task exists
-    if (!(taskId in activeTasks)) {
-        next(new Error('Task not found'));
-        res.status(400);
-        send["error"] = "Active task not found";
-    }
-
+  
     let task = activeTasks[taskId];
-    // check all labels are valid
-    // try {
-    for (let label of labels) {
-        if (label[0] >= task.taskSize) {
-            next(new Error("Image id out of range"));
-            res.status(400);
-            send["error"] = 'Image id out of range';
-        };
-        if (label[1] >= task.keySize) {
-            next(new Error("Label id out of range"));
-            res.status(400);
-            send["error"] = "Label id out of range";
-        };
-    }
-
-    task.pushLabels(labellerAddress, labels);
-
-    // if enough labels have been submitted, complete the task
-    if (task.computeConsenus()) {
-        // add the task to the completed tasks
-        completedTasks[taskId] = task;
-        // remove the task from the active tasks
-        delete activeTasks[taskId];
-        send["completed"] = `true`;
+    // check task exists
+    if (task == undefined) {
+        res.status(400);
+        send['error'] = 'Task does not exist';
+        throw new Error('Task not found');
     }
     else {
-        send["complete"] = `false`
-    };
+        // check all labels are valid
+        // try {
+        for (let label of labels) {
+            if (label[0] >= task.taskSize) {
+                next(new Error("Image id out of range"));
+                res.status(400);
+                send["error"] = 'Image id out of range';
+            };
+            if (label[1] >= task.keySize) {
+                next(new Error("Label id out of range"));
+                res.status(400);
+                send["error"] = "Label id out of range";
+            };
+        }
+
+        task.pushLabels(labellerAddress, labels);
+
+        // if enough labels have been submitted, complete the task
+        if (task.computeConsenus()) {
+            // add the task to the completed tasks
+            completedTasks[taskId] = task;
+            // remove the task from the active tasks
+            delete activeTasks[taskId];
+            send["completed"] = `true`;
+        }
+        else {
+            send["complete"] = `false`
+        };
+    }
     // should send more info than this really
     res.send(send);
 
+});
+
+
+/*
+Allow people to see the results of completed tasks
+Currently an open source dataset as we allow funders to contribute but we could restrict this to only funders 
+Returns an object of images list, labels list, and label options for the completed task
+*/
+app.get('/tasks/:taskId/results', (req, res) => {
+    const {taskId} = req.params;
+    const task = completedTasks[taskId];
+    if (task == undefined) {
+        res.status(400);
+        const activeTask = activeTasks[taskId];
+        if (activeTask == undefined) {
+            res.send({'error': 'Task does not exist'});
+            throw new Error('Task not found');
+        }
+        else {
+            res.send({'error': 'Task not complete'});
+            throw new Error('Task not complete');
+        }
+    }
+    else {
+        res.send(task.getResults());
+    }
 });
 
 app.listen(port, () => {

@@ -1,6 +1,6 @@
 import {Button, Box, Text, Center } from "@chakra-ui/react"
 import {ethers} from 'ethers';
-export default function ConnectWalletButton () {
+export default function ConnectWalletButton ({ onClick }) {
 
     async function connectWallet() {
         const provider = new ethers.providers.Web3Provider(window.ethereum, "rinkeby");
@@ -17,6 +17,11 @@ export default function ConnectWalletButton () {
                 
                 await provider.send("eth_requestAccounts", []);
                 const signer = provider.getSigner();
+
+                if (onClick !== undefined) {
+                    onClick(await signer.getAddress());
+                }
+
                 console.log("Account:", await signer.getAddress());
                 const balance = await provider.getBalance(signer.getAddress());
                 console.log("Balance: ", balance);
