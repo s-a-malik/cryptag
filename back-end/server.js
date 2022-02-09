@@ -17,11 +17,12 @@ TODO:
 - Add a way to see progress of the consensus (% complete)/payouts for labellers
 - Test everything
 */
-const ethers = require('ethers');
+import { ethers } from 'ethers';
 require('dotenv').config();
 
 // TODO add ABI to artifacts
-const Settlement = require('./artifacts/contracts/Settlement.sol/Settlement.json');   
+import * as SettlementContract from '../solidity/artifacts/contracts/Settlement.sol/Settlement.json'
+import * as TaskContract from '../solidity/artifacts/contracts/Task.sol/Task.json'
 // TODO need to save private keys in .env
 const provider = new ethers.providers.JsonRpcProvider(process.env.RINKEBY_URL);
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
@@ -73,10 +74,36 @@ class Task {
         this.taskId = taskId;
         this.taskInfo = taskInfo;
         this.contract = contract;
+        this.taskContract = new ethers.Contract(
+            contract.contractAddress,
+            TaskContract.abi,
+            wallet
+        );
+        this.settlementContract = new ethers.Contract(
+            this.taskContract.settlement(),
+            SettlementContract.abi,
+            wallet,
+        );
+
+        // Register event listeners
+        const settleEvent = {
+            address: this.taskContract.address,
+            topics: [
+                ethers.utils.id('Settle(uint)'),
+            ]
+        };
+        const disperseEvent = {
+            address: this.settlementContract.address,
+            topics: [
+                ethers.utils.id('Deposit(address,uint)'),
+            ]
+        };
+        this.settlementContract.on(settleEvent, this.settleContract.bind(this));
+        this.settlementContract.on(disperseEvent, () => { console.log('disperse success!') });
 
         this.keySize = Object.keys(taskInfo.labelOptions).length;
         this.taskSize = images.length;
-       
+
         this.queue = [];
         this.labelsByItem = {};
         for (let ind = 0; ind < this.taskSize; ind++) {
@@ -130,7 +157,7 @@ class Task {
 
         // try to find a consensus for each image
         let totalPayout = 0;
-        for (let address of this.data.labellers) {this.data.payout[address]=0;}
+        for (let address of this.data.labellers) { this.data.payout[address] = 0; }
 
         // iterate through each image
         for (let id = 0; id < this.taskSize; id++) {
@@ -145,7 +172,7 @@ class Task {
             // add to consensus label list
             this.data.consensusLabels[id] = consensusLabel;
             // add consensus labels to payout for that address
-            for (const [address, label] of Object.entries(this.data.labels[id]) ) {
+            for (const [address, label] of Object.entries(this.data.labels[id])) {
                 if (label == consensusLabel) {
                     this.data.payout[address] += 1;
                     totalPayout += 1;
@@ -177,15 +204,16 @@ class Task {
         // TODO should sync updates about contract funds from blockchain
         // TODO error catching
         console.log("Paying out contract");
-        const settlement = new ethers.Contract(this.contract.contractAddress, Settlement.abi, wallet);
-
+        // const settlement = new ethers.Contract(this.contract.contractAddress, Settlement.abi, wallet);
+        const contractBalance = this.settlementContract.getBalance();
         // iterate through payout and send funds*payout to each address
         for (let address in this.data.payout) {
             // send funds to address
-            const tx = await settlement.disperse(this.data.payout[address], ethers.utils.parseEther(`${this.data.payout[address]*this.contract.funds}`));
+            const outAmount = this.data.payout[address] * contractBalance;
+            const tx = await this.settlementContract.disperse(address, ethers.utils.parseEther(`${outAmount}`));
             // console.log(tx); // will have the details of the transaction pre-mining. 
             await tx.wait();    // wait for the mine
-            console.log(`Tx hash for sending payment to ${this.data.payout[address]}: ${tx.hash}`);
+            console.log(`Tx hash for sending payment to ${address}: ${tx.hash}`);
         }
         console.log("settled!");
     }
@@ -203,7 +231,7 @@ class Task {
             if (!(label[0] in this.data.labels)) {
                 this.data.labels[label[0]] = {};
             }
-            
+
             // check this labeller hasn't already labelled this image
             // if they have, just ignore it entirely for now
             if (this.data.labels[label[0]][labellerAddress] == undefined) {
@@ -223,10 +251,10 @@ class Task {
     */
     updateQueue() {
         let temp = this.labelsByItem;
-        this.queue = Object.keys(this.labelsByItem).map(function(key) {
+        this.queue = Object.keys(this.labelsByItem).map(function (key) {
             return [key, temp[key]];
         });
-        this.queue.sort(function(a,b) {return a[1]-b[1];});
+        this.queue.sort(function (a, b) { return a[1] - b[1]; });
         for (let x in this.queue) {
             this.queue[x] = this.queue[x][0];
         }
@@ -244,7 +272,8 @@ class Task {
         for (let id of this.queue) {
             if (!seens.includes(parseInt(id))) {
                 this.seen[labellerAddress].push(parseInt(id));
-                return [id, this.data.images[id]];}
+                return [id, this.data.images[id]];
+            }
         };
         return false;
     }
@@ -347,7 +376,7 @@ app.get('/tasks', (req, res) => {
     if (showCompleted == 'true') {
         keys = Object.keys(completedTasks);
         for (let key of keys) {
-        infoToDisplay.push(completedTasks[key].getTaskInfo());
+            infoToDisplay.push(completedTasks[key].getTaskInfo());
         }
     }
 
@@ -357,7 +386,7 @@ app.get('/tasks', (req, res) => {
 // create a new task
 app.post('/tasks/create-task', (req, res) => {
     // TODO create contract on client side and send info here 
-    const {taskInfo, contract, images} = req.body;
+    const { taskInfo, contract, images } = req.body;
     const taskId = Date.now();    // TODO: decide what to make this
     // create the task
     activeTasks[taskId] = new Task(taskId, taskInfo, contract, images);
