@@ -61,24 +61,31 @@ export function TaskCreation() {
   async function postToBackend(values) {
     
     // TODO check what time to use? 
+    const signer = provider.getSigner()
+    const signerAddress = await signer.getAddress();
     const contractObject = {
       contractAddress : values.deployedAddress,
-      setter : provider.getSigner().getAddress(),
+      setter : signerAddress,
       created : Date.now(),
       expiry : values['expiryDate'],
-      funds : values['funds']
+      funds : parseFloat(values['funds'])
     };
 
     // convert options to array
     // TODO this looks like a weird data format for options? Shouldn't the option be the value not key?
-    // Why not just an array?
+    // Why not just an array? (SM: should be changed eventually)
     const optionsArray = values['options'].split(/\r?\n/);
+    const labelOptions = {};  
+    for (let i = 0; i < optionsArray.length; i++) {
+      labelOptions[optionsArray[i]] = i;
+    }
+
     const taskInfo = {
       taskName : values['taskName'],
       taskDesription : values['taskDescription'],
       example : values['example'],
       numLabelsRequired : values['numLabels'],
-      labelOptions : optionsArray, 
+      labelOptions : labelOptions, 
       status : "active"
     }
     // convert images to array
@@ -93,7 +100,7 @@ export function TaskCreation() {
     alert(JSON.stringify(data));
     const requestURL = backendURL + '/tasks/create-task'
 
-    const rawResponse = await fetch(backendURL, {
+    const rawResponse = await fetch(requestURL, {
         method: 'POST', // *GET, POST, PUT, DELETE, etc.
         headers: {
           'Content-Type': 'application/json'
@@ -101,8 +108,9 @@ export function TaskCreation() {
         body: JSON.stringify(data) // body data type must match "Content-Type" header
     });
 
-    //const content = await rawResponse.json();
-    //return content;
+    const content = await rawResponse.json();
+    alert(`Task created with id ${content.taskId}`);
+    console.log(`Task created with id ${content.taskId}`);
   }
 
   
@@ -128,7 +136,7 @@ export function TaskCreation() {
     console.log(values);
     // log address of deployed contracts 
     alert(`Contract succesfully deployed. \nSettlement: ${settlement.address} \nTask: ${task.address}`)
-
+    console.log(`Contract succesfully deployed. \nSettlement: ${settlement.address} \nTask: ${task.address}`);
   }
 
 

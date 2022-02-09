@@ -47,8 +47,9 @@ import { getAddress } from '../../lib/metamask';
 
     // persist user state
     const { user, setUser } = useContext(UserContext);
-
-    const url = `http://localhost:3042/tasks/${params.taskId}/get-next-image?labellerAddress=reg`;
+    console.log(user.address);
+    const url = `http://localhost:3042/tasks/${params.taskId}/get-next-image?labellerAddress=${user.address}`;
+    console.log(url);
     console.log("Fetched")
 
     const fetchData = async () => {

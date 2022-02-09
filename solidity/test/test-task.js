@@ -116,6 +116,7 @@ describe("Task", function() {
     await settlement.deployed();
 
     Task = await ethers.getContractFactory("Task");
+    console.log(settlement.address);
     task = await Task.deploy(settlement.address);
     await task.deployed();
     
