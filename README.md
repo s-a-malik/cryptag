@@ -1,24 +1,29 @@
-# decentra-turk
+# CrypTag
 
 Crowdsourcing data labelling tasks on the ethereum blockchain.
 
-## TODO
-
-- [ ] Front end job creation and dataset upload
-- [ ] Front end labelling
-- [ ] Back end label submission and consensus
-- [ ] Contracts for job posting and REP token 
+Final project for Chainshot OxBridge Bootcamp, Dec 2021 - Jan 2022.
 
 
 ## Front End
 
-Built with React. (other framework?)
+Built with React/Chakra UI.
+
+- Task Creation
+- Task Viewing
+- Label a task and submit labels
+- View Results
 
 ## Back End
 
-Server stores data labels given by each address. Uses this to compute consensus label (weighted by $REP).
+Server stores data labels given by each address. Uses this to compute consensus label.
 
-On settlement, uses label accuracy metrics to payout $REP fairly. Pays back the owner for any unlabelled examples
+On settlement, uses label accuracy metrics to payout fairly. 
 
 ## Smart Contracts
 
+- Settlement.sol
+  - Disperses funds to the labellers
+  - This can be changed later on if we adjust the consensus mechanism.
+- Task.sol
+  - Creates and stakes a task.

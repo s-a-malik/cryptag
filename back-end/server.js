@@ -73,9 +73,9 @@ class Task {
     constructor(taskId, taskInfo, contract, images) {
         this.taskId = taskId;
         this.taskInfo = taskInfo;
-        // this.contract = contract;
+        this.contract = contract;
         this.taskContract = new ethers.Contract(
-            contract,
+            contract.contractAddress,
             TaskContract.abi,
             wallet
         );
@@ -205,11 +205,11 @@ class Task {
         // TODO error catching
         console.log("Paying out contract");
         // const settlement = new ethers.Contract(this.contract.contractAddress, Settlement.abi, wallet);
-
+        const contractBalance = this.settlementContract.getBalance();
         // iterate through payout and send funds*payout to each address
         for (let address in this.data.payout) {
             // send funds to address
-            const outAmount = this.data.payout[address] * this.settlementContract.getBalance();
+            const outAmount = this.data.payout[address] * contractBalance;
             const tx = await this.settlementContract.disperse(address, ethers.utils.parseEther(`${outAmount}`));
             // console.log(tx); // will have the details of the transaction pre-mining. 
             await tx.wait();    // wait for the mine
@@ -278,13 +278,25 @@ class Task {
         return false;
     }
 
+    /*
+    Returns the images and consensus labels for a completed task
+    */
+    getResults() {
+        return {
+            images: this.data.images,
+            consensusLabels: this.data.consensusLabels,
+            payout: this.data.payout,
+            labelOptions: this.taskInfo.labelOptions,
+            funds: this.contract.funds,
+        }
+    }
 }
 
 // current and completed task objects for storage, to be indexed by taskId
 const activeTasks = {};
 const completedTasks = {};
 
-// add an example task
+// add example tasks
 activeTasks[0] = new Task(
     0,
     {
@@ -312,6 +324,43 @@ activeTasks[0] = new Task(
         'https://picsum.photos/400',
     ]
 );
+
+completedTasks[1] = new Task(
+    1,
+    {
+        taskName: 'Test Complete Task',
+        taskDescription: 'This is a test task',
+        example: 'https://picsum.photos/200',
+        numLabelsRequired: 3,
+        labelOptions: {
+            'road': 0,
+            'person': 1,
+            'field': 2
+        },
+        status: 'completed',
+    },
+    {
+        contractAddress: '0x0',
+        setter: '0x0',
+        created: Date.now(),
+        expiry: Date.now() + (1000 * 60 * 60 * 24 * 7),
+        funds: 1,
+    },
+    [
+        'https://picsum.photos/200',
+        'https://picsum.photos/300',
+        'https://picsum.photos/400',
+    ]
+);
+completedTasks[1].data = {
+    "images": completedTasks[1].data.images,
+    "consensusLabels": [0,1,0],
+    "payout": {
+        "0xegrioegn": 0.3,
+        "0xegw3224": 0.3,
+        "0xegw32reg4": 0.4
+    }
+}
 
 // show the tasks available to the front end 
 app.get('/tasks', (req, res) => {
@@ -391,46 +440,73 @@ app.post('/tasks/:taskId/submit-labels', async (req, res, next) => {
     const {labellerAddress, labels} = req.body;
     const send = {};
     console.log(`Labels received for task ${taskId} by labeller ${labellerAddress}`);
-
-    // check task exists
-    if (!(taskId in activeTasks)) {
-        next(new Error('Task not found'));
-        res.status(400);
-        send["error"] = "Active task not found";
-    }
-
+  
     let task = activeTasks[taskId];
-    // check all labels are valid
-    // try {
-    for (let label of labels) {
-        if (label[0] >= task.taskSize) {
-            next(new Error("Image id out of range"));
-            res.status(400);
-            send["error"] = 'Image id out of range';
-        };
-        if (label[1] >= task.keySize) {
-            next(new Error("Label id out of range"));
-            res.status(400);
-            send["error"] = "Label id out of range";
-        };
-    }
-
-    task.pushLabels(labellerAddress, labels);
-
-    // if enough labels have been submitted, complete the task
-    if (task.computeConsenus()) {
-        // add the task to the completed tasks
-        completedTasks[taskId] = task;
-        // remove the task from the active tasks
-        delete activeTasks[taskId];
-        send["completed"] = `true`;
+    // check task exists
+    if (task == undefined) {
+        res.status(400);
+        send['error'] = 'Task does not exist';
+        throw new Error('Task not found');
     }
     else {
-        send["complete"] = `false`
-    };
+        // check all labels are valid
+        // try {
+        for (let label of labels) {
+            if (label[0] >= task.taskSize) {
+                next(new Error("Image id out of range"));
+                res.status(400);
+                send["error"] = 'Image id out of range';
+            };
+            if (label[1] >= task.keySize) {
+                next(new Error("Label id out of range"));
+                res.status(400);
+                send["error"] = "Label id out of range";
+            };
+        }
+
+        task.pushLabels(labellerAddress, labels);
+
+        // if enough labels have been submitted, complete the task
+        if (task.computeConsenus()) {
+            // add the task to the completed tasks
+            completedTasks[taskId] = task;
+            // remove the task from the active tasks
+            delete activeTasks[taskId];
+            send["completed"] = `true`;
+        }
+        else {
+            send["complete"] = `false`
+        };
+    }
     // should send more info than this really
     res.send(send);
 
+});
+
+
+/*
+Allow people to see the results of completed tasks
+Currently an open source dataset as we allow funders to contribute but we could restrict this to only funders 
+Returns an object of images list, labels list, and label options for the completed task
+*/
+app.get('/tasks/:taskId/results', (req, res) => {
+    const {taskId} = req.params;
+    const task = completedTasks[taskId];
+    if (task == undefined) {
+        res.status(400);
+        const activeTask = activeTasks[taskId];
+        if (activeTask == undefined) {
+            res.send({'error': 'Task does not exist'});
+            throw new Error('Task not found');
+        }
+        else {
+            res.send({'error': 'Task not complete'});
+            throw new Error('Task not complete');
+        }
+    }
+    else {
+        res.send(task.getResults());
+    }
 });
 
 app.listen(port, () => {
