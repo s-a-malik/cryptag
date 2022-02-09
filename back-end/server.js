@@ -358,11 +358,11 @@ activeTasks[0] = new Task(
         status: 'active',
     },
     {
-        contractAddress: '0xc6bb802E553C1cc4F60043651047A91CDE31B02c',
+        contractAddress: '0x4f0cb04612Cc4E877C03E17Ab486CD966bcf1cE4',
         setter: '0x859E27407Ed7EA2FaBF8DAD193E4a0F83cFE6CcC',
         created: Date.now(),
         expiry: Date.now() + (1000 * 60 * 60 * 24 * 7),
-        funds: 0.09,
+        funds: 0.12,
     },
     [
         'https://wallpapersdsc.net/wp-content/uploads/2016/10/Boxer-Dog-High-Quality-Wallpapers.jpg',
