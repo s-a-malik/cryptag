@@ -112,7 +112,8 @@ class Task {
         const balance = await provider.getBalance(this.taskContract.address);
         console.log(balance);
         const settlementAddress = await this.taskContract.settlement();
-        console.log(settlementAddress);
+        console.log(`Settlement Contract address: ${settlementAddress}`);
+        console.log(`Task Contract address: ${this.contract.contractAddress}`);
         this.settlementContract = new ethers.Contract(
             this.taskContract.settlement(),
             SettlementContract.abi,
